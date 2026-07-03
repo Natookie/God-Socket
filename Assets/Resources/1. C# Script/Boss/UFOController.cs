@@ -103,7 +103,6 @@ public class UFOController : MonoBehaviour, IDamageable
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
         Vector3 directionToPlayer = (player.position - transform.position).normalized;
         
-        // Calculate target position based on distance
         if(distanceToPlayer > followDistance + stoppingDistance){
             targetPosition = player.position + directionToPlayer * followDistance;
             targetPosition.y = player.position.y + followHeight;
@@ -113,7 +112,6 @@ public class UFOController : MonoBehaviour, IDamageable
             targetPosition.y = player.position.y + followHeight;
         }
         else{
-            // Maintain position with slight drift
             targetPosition = Vector3.Lerp(targetPosition, 
                 transform.position + Random.insideUnitSphere * 0.1f, 
                 Time.fixedDeltaTime * 0.5f
@@ -121,23 +119,19 @@ public class UFOController : MonoBehaviour, IDamageable
             targetPosition.y = player.position.y + followHeight;
         }
         
-        // Calculate desired velocity with smooth damping
         Vector3 direction = (targetPosition - transform.position).normalized;
         float distance = Vector3.Distance(transform.position, targetPosition);
         
-        // Speed scaling based on distance (slows down when close)
         float speedMultiplier = Mathf.Clamp01(distance / (followDistance * 0.5f));
         float targetSpeed = moveSpeed * speedMultiplier;
         
         desiredVelocity = direction * targetSpeed;
         
-        // Apply force with damping for smooth physics
         Vector3 force = (desiredVelocity - rb.linearVelocity) * damping;
         force = Vector3.ClampMagnitude(force, maxForce);
         
         rb.AddForce(force, ForceMode.Force);
         
-        // Cap velocity
         if(rb.linearVelocity.magnitude > moveSpeed * 1.5f){
             rb.linearVelocity = rb.linearVelocity.normalized * moveSpeed * 1.5f;
         }
@@ -154,7 +148,6 @@ public class UFOController : MonoBehaviour, IDamageable
         hoverPhase += Time.fixedDeltaTime * hoverFrequency;
         float hoverOffset = Mathf.Sin(hoverPhase) * hoverAmplitude;
         
-        // Apply subtle hover force
         Vector3 hoverForce = Vector3.up * hoverOffset * 2f;
         rb.AddForce(hoverForce, ForceMode.Force);
     }
@@ -175,7 +168,6 @@ public class UFOController : MonoBehaviour, IDamageable
         
         Vector3 fireDirection = (player.position - firePoint.position).normalized;
         
-        // Slight randomness for organic feel
         fireDirection = Quaternion.Euler(
             Random.Range(-3f, 3f),
             Random.Range(-3f, 3f),
@@ -213,12 +205,10 @@ public class UFOController : MonoBehaviour, IDamageable
         
         health -= damageAmount;
         
-        // Visual feedback - flash
         if(visualModel != null){
             StartCoroutine(DamageFlash());
         }
         
-        // Physics reaction - knockback
         Vector3 knockback = Random.insideUnitSphere * 5f;
         knockback.y = 2f;
         rb.AddForce(knockback, ForceMode.Impulse);
