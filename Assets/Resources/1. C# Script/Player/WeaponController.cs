@@ -60,6 +60,7 @@ public class WeaponController : MonoBehaviour
             proj.transform.position = firePoint.position;
             proj.transform.rotation = Quaternion.LookRotation(aimDirection);
             proj.SetActive(true);
+            CameraController.Instance.ShakeCamera(1f, 0.2f, CameraController.ShakePriority.Low);
             
             Rigidbody projRb = proj.GetComponent<Rigidbody>();
             if(projRb) projRb.linearVelocity = aimDirection * projectileSpeed;

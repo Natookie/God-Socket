@@ -57,11 +57,13 @@ public class MovementController : MonoBehaviour
         HandleMovement();
 
         if(boostActive && !isOverheated && !CameraController.Instance.aiming){
-            float currentMaxSpeed = normalMaxSpeed;
+            float currentMaxSpeed = boostActive ? normalMaxSpeed * boostSpeedMultiplier : normalMaxSpeed;
             if(input.AimHeld) currentMaxSpeed *= aimMovementMultiplier;
             
-            if(rb.linearVelocity.magnitude > currentMaxSpeed * 0.5f)
-                energy.DrainBoost(Time.fixedDeltaTime);
+            float speedRatio = rb.linearVelocity.magnitude / currentMaxSpeed;
+            float boostThreshold = boostActive ? 0.4f : 0.5f;
+            
+            if(speedRatio > boostThreshold) energy.DrainBoost(Time.fixedDeltaTime);
         }
     }
 

@@ -3,12 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using NaughtyAttributes;
 
-public class BossController : MonoBehaviour, IDamageable
+public class BossController : MonoBehaviour
 {
-    [Header("BOSS STATS")]
-    public float maxHealth = 100f;
-    public float currentHealth;
-    
     [Header("STATE TIMING")]
     public float stateDuration = 5f;
     public float stateVariance = 1.5f;
@@ -28,20 +24,18 @@ public class BossController : MonoBehaviour, IDamageable
     public int missileCount = 3;
     
     [Header("GRAVITY FIELD")]
-    public float fieldRadius = 20f;
-    public float chargeTime = 2f;
-    public float laserDuration = 2f;
-    public float laserDamage = 10f;
-    public int laserCount = 3;
-    public GameObject weakPointPrefab;
-    public float weakPointHealth = 30f;
-    public Vector3 weakPointOffset = new Vector3(0, 4f, 6f);
+    public GravityFieldController gravityFieldController;
+    public LaserFieldController laserFieldController;
+    public WeakpointManager weakpointManager;
+    public BossAimer bossAimer;
+    public float chargeTime = 10f;
+    public float laserDuration = 5f;
     
     [Header("REFERENCES")]
     public Transform player;
+    public BossHealthSystem healthSystem;
     public ParticleSystem deathEffect;
     public AudioSource audioSource;
-    public AudioClip damageSound;
     public AudioClip deathSound;
 
     [Header("DEBUG")]
@@ -57,21 +51,36 @@ public class BossController : MonoBehaviour, IDamageable
     private List<GameObject> missilePool = new List<GameObject>();
     private List<GameObject> activeUFOs = new List<GameObject>();
     private List<GameObject> activeMissiles = new List<GameObject>();
-    private List<GameObject> activeLasers = new List<GameObject>();
-    private List<float> laserX = new List<float>();
     
-    private Transform weakPoint;
     private bool isGravityActive = false;
     private bool isLaserActive = false;
-    private List<float> laserXPos = new List<float>();
+    private bool isGravityStateInterruptible = false;
+    private Coroutine gravityCoroutine;
 
     void Start(){
-        currentHealth = maxHealth;
         CreatePools();
         
         if(player == null){
             GameObject p = GameObject.FindGameObjectWithTag("Player");
             if(p != null) player = p.transform;
+        }
+
+        if(healthSystem == null) healthSystem = GetComponent<BossHealthSystem>();
+        if(healthSystem != null) healthSystem.OnDeath += Die;
+        if(gravityFieldController == null) gravityFieldController = GetComponent<GravityFieldController>();
+        if(laserFieldController == null) laserFieldController = GetComponent<LaserFieldController>();
+        if(weakpointManager == null) weakpointManager = GetComponent<WeakpointManager>();
+        if(bossAimer == null) bossAimer = GetComponent<BossAimer>();
+        
+        if(weakpointManager != null){
+            weakpointManager.OnAllWeakPointsDestroyed += OnAllWeakPointsDestroyed;
+        }
+    }
+    
+    void OnDestroy(){
+        if(healthSystem != null) healthSystem.OnDeath -= Die;
+        if(weakpointManager != null){
+            weakpointManager.OnAllWeakPointsDestroyed -= OnAllWeakPointsDestroyed;
         }
     }
     
@@ -112,19 +121,17 @@ public class BossController : MonoBehaviour, IDamageable
             }
         }
         else{
-            if(timer >= stateDuration + Random.Range(-stateVariance, stateVariance)){
+            if(isGravityStateInterruptible && timer >= stateDuration + Random.Range(-stateVariance, stateVariance)){
                 timer = 0f;
                 EndCurrentState();
                 currentState = BossState.Idle;
             }
         }
         
-        UpdateGravity();
-        UpdateLasers();
         CleanupDeadEntities();
     }
 
-     void HandleDebugInput(){
+    void HandleDebugInput(){
         if(Input.GetKeyDown(KeyCode.Alpha1)){
             DebugUFO();
             Debug.Log("KD1");
@@ -145,15 +152,18 @@ public class BossController : MonoBehaviour, IDamageable
         switch(choice){
             case 0: 
                 currentState = BossState.UFO;
+                isGravityStateInterruptible = true;
                 StartCoroutine(SpawnUFOs());
                 break;
             case 1: 
                 currentState = BossState.Missile;
+                isGravityStateInterruptible = true;
                 StartCoroutine(SpawnMissile());
                 break;
             case 2: 
                 currentState = BossState.Gravity;
-                StartCoroutine(GravitySequence());
+                isGravityStateInterruptible = false;
+                gravityCoroutine = StartCoroutine(GravitySequence());
                 break;
         }
     }
@@ -206,7 +216,7 @@ public class BossController : MonoBehaviour, IDamageable
         ActivateGravity();
         
         float chargeTimer = 0f;
-        while(chargeTimer < chargeTime && !isDefeated){
+        while(chargeTimer < chargeTime && !isDefeated && isGravityActive){
             chargeTimer += Time.deltaTime;
             yield return null;
         }
@@ -216,7 +226,7 @@ public class BossController : MonoBehaviour, IDamageable
             ActivateLasers();
             
             float laserTimer = 0f;
-            while(laserTimer < laserDuration && !isDefeated){
+            while(laserTimer < laserDuration && !isDefeated && isGravityActive){
                 laserTimer += Time.deltaTime;
                 yield return null;
             }
@@ -226,103 +236,46 @@ public class BossController : MonoBehaviour, IDamageable
         }
         
         DeactivateGravity();
+        currentState = BossState.Idle;
+        isGravityStateInterruptible = true;
+        gravityCoroutine = null;
     }
     
     void ActivateGravity(){
         isGravityActive = true;
-        SpawnWeakPoint();
+        if(gravityFieldController != null) gravityFieldController.Activate();
+        if(weakpointManager != null) weakpointManager.ActivateAll();
     }
     
     void DeactivateGravity(){
         isGravityActive = false;
-        DespawnWeakPoint();
-    }
-    
-    void UpdateGravity(){
-        if(!isGravityActive) return;
+        if(gravityFieldController != null) gravityFieldController.Deactivate();
+        if(weakpointManager != null) weakpointManager.DeactivateAll();
     }
     
     void ActivateLasers(){
-        laserX.Clear();
-        for(int i = 0; i < laserCount; i++){
-            float x = Random.Range(-fieldRadius * 0.7f, fieldRadius * 0.7f);
-            laserX.Add(x);
-            
-            Vector3 pos = transform.position + new Vector3(x, 0, 0);
-            GameObject laser = CreateLaserLine(pos);
-            activeLasers.Add(laser);
-        }
-    }
-    
-    void UpdateLasers(){
-        if(!isLaserActive) return;
-        
-        for(int i = 0; i < laserX.Count; i++){
-            Vector3 pos = transform.position + new Vector3(laserX[i], 0, 0);
-            Vector3 start = pos + Vector3.down * fieldRadius;
-            Vector3 end = pos + Vector3.up * fieldRadius;
-            
-            RaycastHit[] hits = Physics.RaycastAll(start, Vector3.up, fieldRadius * 2f);
-            foreach(RaycastHit hit in hits){
-                IDamageable dmg = hit.collider.GetComponent<IDamageable>();
-                if(dmg != null) dmg.TakeDamage(laserDamage * Time.deltaTime);
-            }
+        if(laserFieldController != null && weakpointManager != null){
+            List<Vector3> origins = weakpointManager.GetLaserOrigins();
+            laserFieldController.ActivateLasers(origins);
         }
     }
     
     void DeactivateLasers(){
-        foreach(GameObject laser in activeLasers){
-            if(laser != null) Destroy(laser);
-        }
-        activeLasers.Clear();
-        laserX.Clear();
+        isLaserActive = false;
+        if(laserFieldController != null) laserFieldController.DeactivateLasers();
     }
     
-    GameObject CreateLaserLine(Vector3 position){
-        GameObject obj = new GameObject("Laser");
-        obj.transform.position = position;
-        obj.transform.parent = transform;
-        
-        LineRenderer line = obj.AddComponent<LineRenderer>();
-        line.startWidth = 0.5f;
-        line.endWidth = 0.5f;
-        line.material = new Material(Shader.Find("Sprites/Default"));
-        line.startColor = Color.red;
-        line.endColor = Color.red;
-        
-        Vector3[] positions = new Vector3[]{
-            position + Vector3.down * fieldRadius,
-            position + Vector3.up * fieldRadius
-        };
-        line.positionCount = positions.Length;
-        line.SetPositions(positions);
-        
-        return obj;
-    }
-    
-    void SpawnWeakPoint(){
-        if(weakPointPrefab == null) return;
-        
-        Vector3 pos = transform.position + transform.rotation * weakPointOffset;
-        GameObject obj = Instantiate(weakPointPrefab, pos, Quaternion.identity);
-        obj.transform.parent = transform;
-        weakPoint = obj.transform;
-        
-        WeakPointController wp = obj.GetComponent<WeakPointController>();
-        if(wp != null) wp.Initialize(weakPointHealth, OnWeakPointDestroyed);
-    }
-    
-    void DespawnWeakPoint(){
-        if(weakPoint != null){
-            Destroy(weakPoint.gameObject);
-            weakPoint = null;
-        }
-    }
-    
-    void OnWeakPointDestroyed(){
+    void OnAllWeakPointsDestroyed(){
         if(isGravityActive){
+            if(gravityCoroutine != null){
+                StopCoroutine(gravityCoroutine);
+                gravityCoroutine = null;
+            }
+            
             DeactivateGravity();
             DeactivateLasers();
+            currentState = BossState.Idle;
+            isGravityStateInterruptible = true;
         }
     }
     
@@ -338,23 +291,8 @@ public class BossController : MonoBehaviour, IDamageable
         activeMissiles.RemoveAll(m => m == null || !m.activeInHierarchy);
     }
     
-    public void TakeDamage(float damage){
-        if(isDefeated) return;
-        
-        currentHealth -= damage;
-        
-        if(audioSource != null && damageSound != null){
-            audioSource.PlayOneShot(damageSound);
-        }
-        
-        if(currentHealth <= 0f) Die();
-    }
-    
-    public bool IsAlive(){
-        return !isDefeated;
-    }
-    
     void Die(){
+        if(isDefeated) return;
         isDefeated = true;
         
         if(deathEffect != null) deathEffect.Play();
@@ -363,7 +301,7 @@ public class BossController : MonoBehaviour, IDamageable
         foreach(GameObject ufo in activeUFOs) if(ufo != null) Destroy(ufo);
         foreach(GameObject missile in activeMissiles) if(missile != null) Destroy(missile);
         DeactivateLasers();
-        DespawnWeakPoint();
+        if(weakpointManager != null) weakpointManager.DeactivateAll();
         
         Destroy(gameObject, 3f);
     }
@@ -372,6 +310,6 @@ public class BossController : MonoBehaviour, IDamageable
     [Button("Force UFO")] void DebugUFO(){ if(!isDefeated) StartCoroutine(SpawnUFOs()); }
     [Button("Force Missile")] void DebugMissile(){ if(!isDefeated) StartCoroutine(SpawnMissile()); }
     [Button("Force Gravity")] void DebugGravity(){ if(!isDefeated) StartCoroutine(GravitySequence()); }
-    [Button("Damage 50")] void DebugDamage(){ TakeDamage(50f); }
+    [Button("Damage 50")] void DebugDamage(){ if(healthSystem != null) healthSystem.TakeDamage(50f); }
     #endif
 }

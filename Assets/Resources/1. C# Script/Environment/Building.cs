@@ -39,6 +39,7 @@ public class Building : MonoBehaviour, IDamageable
         health -= damage;
         if(health <= 0){
             BuildingManager.Instance.SetDestroyed(this);
+            CameraController.Instance.ShakeCamera(7f, 1.5f, CameraController.ShakePriority.Critical);
             DestroyBuilding();
             Destroy(gameObject, 30f);
         }
@@ -48,8 +49,9 @@ public class Building : MonoBehaviour, IDamageable
         if(destroyed) return;
         col.enabled = false;
         fullMesh.enabled = false;
-
         destroyed = true;
+        if(this.transform.childCount > 0) return;
+
         Vector3 explosionOrigin = transform.position + Vector3.up * 2f;
         for(int i = 1; i < transform.childCount; i++){
             Transform piece = transform.GetChild(i);
