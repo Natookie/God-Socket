@@ -65,7 +65,7 @@ public class PlayerController : MonoBehaviour
         else if(!input.BoostHeld && currentState == PlayerState.Boosting) ExitBoosting();
     }
 
-    bool CanBoost() => energy.CurrentEnergy > 0 && currentState != PlayerState.Overheated;
+    bool CanBoost() => energy.GetCurrentEnergy() > 0 && currentState != PlayerState.Overheated;
     void EnterAiming() => currentState = PlayerState.Aiming;
     void ExitAiming() => currentState = PlayerState.Normal;
     void EnterBoosting(){

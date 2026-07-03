@@ -8,6 +8,7 @@ public class WeaponController : MonoBehaviour
     public GameObject projectilePrefab;
     public Transform firePoint;
     public float projectileSpeed = 50f;
+    public float maxRange = 100f;
 
     [Header("POOLING")]
     public Transform poolParent;
@@ -17,6 +18,7 @@ public class WeaponController : MonoBehaviour
     public InputHandler input;
     public EnergySystem energy;
     public Camera playerCamera;
+    public Transform playerTransform;
 
     private float nextFireTime;
     private bool isOverheated = false;
@@ -35,6 +37,11 @@ public class WeaponController : MonoBehaviour
             proj.SetActive(false);
             projectilePool.Add(proj);
         }
+        
+        if(playerTransform == null){
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if(player != null) playerTransform = player.transform;
+        }
     }
 
     void Update(){
@@ -47,15 +54,34 @@ public class WeaponController : MonoBehaviour
 
         energy.Consume(energy.shotCost);
         if(projectilePrefab && firePoint && playerCamera){
+            Vector3 aimDirection = GetAimDirection();
+            
             GameObject proj = GetPooledProjectile();
             proj.transform.position = firePoint.position;
-            proj.transform.rotation = Quaternion.LookRotation(playerCamera.transform.forward);
+            proj.transform.rotation = Quaternion.LookRotation(aimDirection);
             proj.SetActive(true);
+            
             Rigidbody projRb = proj.GetComponent<Rigidbody>();
-            if(projRb) projRb.linearVelocity = playerCamera.transform.forward * projectileSpeed;
+            if(projRb) projRb.linearVelocity = aimDirection * projectileSpeed;
         }
 
         nextFireTime = Time.time + fireRate;
+    }
+
+    Vector3 GetAimDirection(){
+        Vector3 screenCenter = new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f);
+        Ray ray = playerCamera.ScreenPointToRay(screenCenter);
+        
+        RaycastHit hit;
+        if(Physics.Raycast(ray, out hit, maxRange)){
+            Vector3 direction = (hit.point - firePoint.position).normalized;
+            return direction;
+        }
+        else{
+            Vector3 targetPoint = ray.GetPoint(maxRange);
+            Vector3 direction = (targetPoint - firePoint.position).normalized;
+            return direction;
+        }
     }
 
     GameObject GetPooledProjectile(){

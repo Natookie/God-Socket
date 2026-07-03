@@ -13,6 +13,7 @@ public class MovementController : MonoBehaviour
     public float strafeAcceleration = 15f;
     public float verticalAcceleration = 12f;
     public float brakingAcceleration = 35f;
+    public float boostAccelerationMultiplier = 2.5f;
 
     [Header("MOVEMENT FEEL")]
     public float idleDamping = 2f;
@@ -55,7 +56,13 @@ public class MovementController : MonoBehaviour
 
         HandleMovement();
 
-        if(boostActive && !isOverheated) energy.DrainBoost(Time.fixedDeltaTime);
+        if(boostActive && !isOverheated && !CameraController.Instance.aiming){
+            float currentMaxSpeed = normalMaxSpeed;
+            if(input.AimHeld) currentMaxSpeed *= aimMovementMultiplier;
+            
+            if(rb.linearVelocity.magnitude > currentMaxSpeed * 0.5f)
+                energy.DrainBoost(Time.fixedDeltaTime);
+        }
     }
 
     void HandleMovement(){
@@ -68,7 +75,19 @@ public class MovementController : MonoBehaviour
         Vector3 right = Vector3.ProjectOnPlane(camRight, Vector3.up).normalized;
         Vector3 up = Vector3.up;
 
-        Vector3 desiredAcceleration = forward * moveInput.z * forwardAcceleration + right * moveInput.x * strafeAcceleration + up * moveInput.y * verticalAcceleration;
+        float currentForwardAccel = forwardAcceleration;
+        float currentStrafeAccel = strafeAcceleration;
+        float currentVerticalAccel = verticalAcceleration;
+
+        if(boostActive){
+            currentForwardAccel *= boostAccelerationMultiplier;
+            currentStrafeAccel *= boostAccelerationMultiplier;
+            currentVerticalAccel *= boostAccelerationMultiplier;
+        }
+
+        Vector3 desiredAcceleration = forward * moveInput.z * currentForwardAccel + 
+                                       right * moveInput.x * currentStrafeAccel + 
+                                       up * moveInput.y * currentVerticalAccel;
 
         WorldMoveDirection = desiredAcceleration.normalized;
 

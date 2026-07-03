@@ -18,19 +18,19 @@ MonoBehaviour:
     m_Value: 0
   threshold:
     m_OverrideState: 1
-    m_Value: 15
+    m_Value: 1
   intensity:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0.28
   scatter:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0.31
   clamp:
     m_OverrideState: 0
     m_Value: 65472
   tint:
     m_OverrideState: 1
-    m_Value: {r: 1, g: 0.98882246, b: 0.8254717, a: 1}
+    m_Value: {r: 0.8235294, g: 0.97409767, b: 1, a: 1}
   highQualityFiltering:
     m_OverrideState: 1
     m_Value: 1
@@ -46,7 +46,7 @@ MonoBehaviour:
     dimension: 1
   dirtIntensity:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 2
 --- !u!114 &-3357603926938260329
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -62,7 +62,7 @@ MonoBehaviour:
   active: 1
   color:
     m_OverrideState: 1
-    m_Value: {r: 0.34117648, g: 0.29896593, b: 0.01568627, a: 1}
+    m_Value: {r: 0.0873754, g: 0.8820755, b: 0.8779996, a: 1}
   center:
     m_OverrideState: 0
     m_Value: {x: 0.5, y: 0.5}
@@ -180,7 +180,7 @@ MonoBehaviour:
   active: 1
   temperature:
     m_OverrideState: 1
-    m_Value: 10
+    m_Value: -9
   tint:
     m_OverrideState: 0
     m_Value: -22
@@ -298,10 +298,10 @@ MonoBehaviour:
   active: 1
   lift:
     m_OverrideState: 1
-    m_Value: {x: 1, y: 0.9582073, z: 0.9485498, w: -0.026490066}
+    m_Value: {x: 1, y: 0.9214154, z: 0.9959932, w: -0.026490066}
   gamma:
     m_OverrideState: 1
-    m_Value: {x: 0.9953754, y: 1, z: 0.95102906, w: 0}
+    m_Value: {x: 0.95060766, y: 0.9893603, z: 1, w: 0.39473683}
   gain:
     m_OverrideState: 1
-    m_Value: {x: 0.9972994, y: 1, z: 0.95829195, w: 0}
+    m_Value: {x: 0.98100394, y: 0.95108366, z: 1, w: 0}

@@ -11,8 +11,8 @@ public class EnergySystem : MonoBehaviour
 
     [Header("CURRENT STATE")]
     [SerializeField] private float currentEnergy;
+    [SerializeField] private bool infiniteEnergy;
 
-    public float CurrentEnergy => currentEnergy;
     public float MaxEnergy => maxEnergy;
     public bool IsDepleted => currentEnergy <= 0f;
 
@@ -24,7 +24,10 @@ public class EnergySystem : MonoBehaviour
         currentEnergy = maxEnergy;
     }
 
-    public bool CanAfford(float amount) => currentEnergy >= amount;
+    public bool CanAfford(float amount){
+        if(infiniteEnergy) return true;
+        return currentEnergy >= amount;
+    }
     public bool Consume(float amount){
         if(amount <= 0f) return true;
         if(currentEnergy < amount) return false;
@@ -48,4 +51,5 @@ public class EnergySystem : MonoBehaviour
     }
 
     public void DrainBoost(float deltaTime) => Consume(boostDrainPerSecond * deltaTime);
+    public float GetCurrentEnergy() => currentEnergy;
 }
