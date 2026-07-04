@@ -69,7 +69,6 @@ public class Building : MonoBehaviour, IDamageable
         health -= damage;
         if(health <= 0){
             BuildingManager.Instance.SetDestroyed(this);
-            CameraController.Instance.ShakeCamera(1.5f, 1f, CameraController.ShakePriority.Critical);
             DestroyBuilding();
             PlayExplosionParticles();
         }

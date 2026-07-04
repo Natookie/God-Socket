@@ -35,7 +35,7 @@ Material:
     - _MediumSpeed: 1
     - _NoiseScale: 43
     - _NoiseSpeed: 2
-    - _Opacity: 2
+    - _Opacity: 0
     - _RimPower: 1
     - _Threshold: 0.45
     - _WarpStrength: 1.27

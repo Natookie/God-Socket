@@ -12,21 +12,43 @@ public class WeakpointController : MonoBehaviour, IDamageable
     
     private bool isDestroyed = false;
     private bool isActive = false;
-
+    private Renderer[] renderers;
+    private Material currentMaterial;
+    private Material deactivatedMaterial;
+    
+    void Awake(){
+        if(visualObject != null){
+            renderers = visualObject.GetComponentsInChildren<Renderer>();
+        }
+    }
+    
     void Start(){
-        if(visualObject != null) visualObject.SetActive(false);
         isActive = false;
+        isDestroyed = false;
     }
     
     public void Activate(){
         isActive = true;
         isDestroyed = false;
-        if(visualObject != null) visualObject.SetActive(true);
     }
     
     public void Deactivate(){
         isActive = false;
-        if(visualObject != null) visualObject.SetActive(false);
+        SetMaterial(deactivatedMaterial);
+    }
+    
+    public void SetMaterial(Material material){
+        if(renderers == null || renderers.Length == 0) return;
+        if(material == null) return;
+        
+        currentMaterial = material;
+        foreach(Renderer renderer in renderers){
+            if(renderer != null) renderer.material = material;
+        }
+    }
+    
+    public void SetDeactivatedMaterial(Material material){
+        deactivatedMaterial = material;
     }
     
     public void TakeDamage(float damage){
@@ -36,7 +58,7 @@ public class WeakpointController : MonoBehaviour, IDamageable
         if(health <= 0){
             isDestroyed = true;
             isActive = false;
-            if(visualObject != null) visualObject.SetActive(false);
+            SetMaterial(deactivatedMaterial);
             OnWeakPointDestroyed?.Invoke(this);
         }
     }

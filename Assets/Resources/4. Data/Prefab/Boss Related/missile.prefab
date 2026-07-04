@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 2661613094818956426}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.013, z: 0.04}
+  m_LocalPosition: {x: 0, y: 0.0204, z: 0.04}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -45,6 +45,7 @@ GameObject:
   - component: {fileID: 2986278407283208335}
   - component: {fileID: 5593528415686856897}
   - component: {fileID: 6431333642685659502}
+  - component: {fileID: 3006692640865621786}
   m_Layer: 9
   m_Name: missile
   m_TagString: Untagged
@@ -67,6 +68,7 @@ Transform:
   m_Children:
   - {fileID: 6415872225415842541}
   - {fileID: 4359548180654763155}
+  - {fileID: 9153685045318715203}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!33 &8291566294524459825
@@ -179,9 +181,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3872693737a8be49893e8800fa93d7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissileLauncher
-  speed: 25
+  speed: 12
   rotationSpeed: 200
-  damage: 75
+  health: 50
+  damage: 85
   explosionRadius: 5
   maxLifeTime: 100
   target: {fileID: 0}
@@ -189,8 +192,9 @@ MonoBehaviour:
   explosionEffect: {fileID: 0}
   isBeingRidden: 0
   ridePosition: {fileID: 6415872225415842541}
-  rideDetectionRadius: 3
-  mouseSensitivity: 2
+  detectionPoint: {fileID: 9153685045318715203}
+  rideDetectionRadius: 5
+  mouseSensitivity: 7
   yawSpeed: 4
   pitchSpeed: 3
   minPitch: -80
@@ -198,6 +202,64 @@ MonoBehaviour:
   dismountLaunchForce: 100
   dismountLaunchUpForce: 5
   mountCooldown: 3
+--- !u!54 &3006692640865621786
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2798249107066460989}
+  serializedVersion: 5
+  m_Mass: 1000
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!1 &3015891206417904127
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9153685045318715203}
+  m_Layer: 9
+  m_Name: Detection Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9153685045318715203
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3015891206417904127}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.0721}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 234653433662849144}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &4364111720340507649
 PrefabInstance:
   m_ObjectHideFlags: 0

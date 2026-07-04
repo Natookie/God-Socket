@@ -40,9 +40,9 @@ public class EnergySystem : MonoBehaviour
 
     public bool Consume(float amount){
         if(amount <= 0f) return true;
-        if(currentEnergy < amount) return false;
 
         currentEnergy -= amount;
+        currentEnergy = Mathf.Max(0, currentEnergy);
         UpdateRatio();
         OnEnergyChanged?.Invoke(currentEnergy, maxEnergy);
         if(IsDepleted) OnEnergyDepleted?.Invoke();

@@ -14363,7 +14363,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8753904135304619078}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.5, y: -0.5, z: 0.5, w: 0.5}
+  m_LocalRotation: {x: -0.61237246, y: -0.35355335, z: 0.61237246, w: 0.35355335}
   m_LocalPosition: {x: 4.02, y: 27.11, z: 42.66}
   m_LocalScale: {x: 142.46, y: 142.46, z: 142.46}
   m_ConstrainProportionsScale: 1
@@ -14371,7 +14371,7 @@ Transform:
   - {fileID: 4831248322567003307}
   - {fileID: 4199217287229846968}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 90}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 120}
 --- !u!33 &2635743204634398522
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -14487,20 +14487,32 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 71dab8d740dc6bd4e81d68e7903886b3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UFOSummoner
-  moveSpeed: 15
-  rotationSpeed: 180
-  followDistance: 10
-  followHeight: 5
-  stoppingDistance: 2
-  damping: 2
-  maxForce: 30
-  hoverAmplitude: 0.5
-  hoverFrequency: 2
-  health: 20
-  fireRate: 1.5
-  damage: 10
-  attackRange: 25
+  m_EditorClassIdentifier: Assembly-CSharp::UFOController
+  moveSpeed: 25
+  rotationSpeed: 300
+  followDistance: 5
+  followHeight: 3
+  stoppingDistance: 1
+  damping: 4
+  maxForce: 50
+  hoverAmplitude: 0.3
+  hoverFrequency: 3
+  wanderRadius: 1.5
+  wanderChangeInterval: 1.5
+  wanderSmoothness: 3
+  turbulenceForce: 3
+  turbulenceChangeRate: 1
+  personality: 1
+  avoidanceRadius: 2
+  avoidanceStrength: 10
+  movementPredictionTime: 1
+  movementPredictionStrength: 1
+  shootingPredictionTime: 0.8
+  shootingPredictionStrength: 1
+  health: 70
+  damage: 15
+  attackRange: 35
+  aimSpeed: 10
   projectilePrefab: {fileID: 5504401026066516806, guid: 6dbfec0202111e54a9f49e502c9070af, type: 3}
   firePoint: {fileID: 4831248322567003307}
   visualModel: {fileID: 8753904135304619078}

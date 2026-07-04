@@ -2,17 +2,21 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-public class MissileController : MonoBehaviour
+public class MissileController : MonoBehaviour, IDamageable
 {
     [Header("MOVEMENT")]
     public float speed = 20f;
     public float rotationSpeed = 200f;
+
+    [Header("HEALTH")]
+    public float health = 50f;
     
     [Header("COMBAT")]
     public float damage = 30f;
     public float explosionRadius = 4f;
     public float maxLifeTime = 5f;
     public Transform target;
+    public float enemyDamageMultiplier = 3f;
     
     [Header("VISUAL")]
     public GameObject visualModel;
@@ -21,6 +25,7 @@ public class MissileController : MonoBehaviour
     [Header("RIDING")]
     public bool isBeingRidden = false;
     public Transform ridePosition;
+    public Transform detectionPoint;
     public float rideDetectionRadius = 3f;
     public float mouseSensitivity = 2f;
     public float yawSpeed = 180f;
@@ -49,15 +54,15 @@ public class MissileController : MonoBehaviour
     private float yaw;
     private float pitch;
     private InputHandler playerInput;
+    private bool hitEnemy = false;
     
     void Awake(){
         rb = GetComponent<Rigidbody>();
         if(rb == null) rb = gameObject.AddComponent<Rigidbody>();
-        rb.isKinematic = true;
         rb.useGravity = false;
         
         missileCollider = GetComponent<BoxCollider>();
-        enemyLayerMask = ~LayerMask.GetMask("Enemy");
+        enemyLayerMask = ~LayerMask.GetMask("Projectile", "Player");
         
         isActive = true;
         isExploded = false;
@@ -68,6 +73,7 @@ public class MissileController : MonoBehaviour
             ridePosition.localPosition = new Vector3(0, 0.5f, -0.5f);
         }
         
+        if(detectionPoint == null) detectionPoint = transform;
         Vector3 angles = transform.rotation.eulerAngles;
         yaw = angles.y;
         pitch = angles.x;
@@ -83,12 +89,15 @@ public class MissileController : MonoBehaviour
         targetedBuilding = building;
         BuildingManager.Instance.SetTargeted(building, true);
         
+        health = 50f;
+        damage = 100f;
         target = building.transform;
         isActive = true;
         isExploded = false;
         lifeTimer = 0f;
         isPlayerControlled = false;
         isGoingStraight = false;
+        hitEnemy = false;
         
         if(visualModel != null) visualModel.SetActive(true);
         if(missileCollider != null) missileCollider.enabled = true;
@@ -100,24 +109,12 @@ public class MissileController : MonoBehaviour
     
     void Update(){
         if(!isActive || isExploded) return;
-        
-        lifeTimer += Time.deltaTime;
-        if(lifeTimer >= maxLifeTime){
-            Explode();
-            return;
-        }
-        
-        if(!hasRider){
-            CheckForNearbyPlayer();
-        }
-        
+        if(!hasRider) CheckForNearbyPlayer();
         if(isPlayerControlled && hasRider){
             UpdatePlayerControlledMovement();
             CheckImpact();
             
-            if(Input.GetKeyDown(KeyCode.Space)){
-                DismountPlayer();
-            }
+            if(Input.GetKeyDown(KeyCode.Space)) DismountPlayer();
         }
         else if(isGoingStraight){
             UpdateStraightMovement();
@@ -136,7 +133,8 @@ public class MissileController : MonoBehaviour
     void CheckForNearbyPlayer(){
         if(Time.time - lastDismountTime < mountCooldown) return;
         
-        Collider[] colliders = Physics.OverlapSphere(transform.position, rideDetectionRadius);
+        Vector3 detectionPos = transform.position;
+        Collider[] colliders = Physics.OverlapSphere(detectionPos, rideDetectionRadius);
         foreach(Collider col in colliders){
             if(col.CompareTag("Player")){
                 MovementController playerController = col.GetComponent<MovementController>();
@@ -156,11 +154,16 @@ public class MissileController : MonoBehaviour
         isBeingRidden = true;
         isPlayerControlled = true;
         isGoingStraight = false;
+
+        if(this.gameObject.layer == 9) gameObject.layer = 6;
+
+        Collider playerCollider = rider.GetComponent<Collider>();
+        if(playerCollider != null && missileCollider != null) Physics.IgnoreCollision(playerCollider, missileCollider, true);
         
         rider.transform.SetParent(transform);
         rider.transform.localPosition = ridePosition.localPosition;
         rider.transform.localRotation = Quaternion.identity;
-        
+
         Rigidbody playerRb = rider.GetComponent<Rigidbody>();
         if(playerRb != null) playerRb.isKinematic = true;
         
@@ -170,6 +173,12 @@ public class MissileController : MonoBehaviour
             playerController.SetRidingMissile(this);
             playerInput = playerController.input;
         }
+        
+        Vector3 currentAngles = transform.rotation.eulerAngles;
+        yaw = currentAngles.y;
+        pitch = currentAngles.x;
+        if(pitch > 180f) pitch -= 360f;
+        pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
     }
     
     void UpdatePlayerControlledMovement(){
@@ -208,6 +217,12 @@ public class MissileController : MonoBehaviour
     
     void DismountPlayer(){
         if(!hasRider || rider == null) return;
+        
+        Collider playerCollider = rider.GetComponent<Collider>();
+        if(playerCollider != null && missileCollider != null){
+            Physics.IgnoreCollision(playerCollider, missileCollider, false);
+        }
+        
         straightDirection = transform.forward;
         isGoingStraight = true;
         gameObject.layer = LayerMask.NameToLayer("Projectile");
@@ -221,10 +236,7 @@ public class MissileController : MonoBehaviour
         rider.transform.SetParent(null);
         
         Rigidbody playerRb = rider.GetComponent<Rigidbody>();
-        if(playerRb != null){
-            playerRb.isKinematic = false;
-            playerRb.linearVelocity = transform.forward * dismountLaunchForce + Vector3.up * dismountLaunchUpForce;
-        }
+        if(playerRb != null) playerRb.linearVelocity = transform.forward * dismountLaunchForce + Vector3.up * dismountLaunchUpForce;
         
         lastDismountTime = Time.time;
         
@@ -250,22 +262,26 @@ public class MissileController : MonoBehaviour
     }
     
     void CheckImpact(){
-        float distanceToTarget = Vector3.Distance(transform.position, target.position);
-        
-        if(distanceToTarget < 1.5f){
+        Vector3 detectionPos = detectionPoint != null ? detectionPoint.position : transform.position;
+        float distanceToTarget = Vector3.Distance(detectionPos, target.position);
+        if(distanceToTarget < .5f){
             Explode();
             return;
         }
         
         RaycastHit hit;
-        if(Physics.Raycast(transform.position, transform.forward, out hit, speed * Time.deltaTime + 0.5f, enemyLayerMask)){
+        if(Physics.Raycast(detectionPos, transform.forward, out hit, speed * Time.deltaTime + 0.5f, enemyLayerMask)){
             IDamageable damageable = hit.collider.GetComponent<IDamageable>();
             if(damageable != null){
+                if(hit.collider.gameObject.layer == LayerMask.NameToLayer("Enemy")){
+                    hitEnemy = true;
+                }
                 Explode();
                 return;
             }
             
             if((hasRider || isGoingStraight) && hit.collider.gameObject.layer == LayerMask.NameToLayer("Enemy")){
+                hitEnemy = true;
                 Explode();
                 return;
             }
@@ -288,20 +304,29 @@ public class MissileController : MonoBehaviour
         isBeingRidden = false;
         if(targetedBuilding != null) BuildingManager.Instance.SetTargeted(targetedBuilding, false);
         
+        Vector3 explosionCenter = detectionPoint != null ? detectionPoint.position : transform.position;
+        
         if(explosionEffect != null){
-            ParticleSystem explosion = Instantiate(explosionEffect, transform.position, Quaternion.identity);
+            ParticleSystem explosion = Instantiate(explosionEffect, explosionCenter, Quaternion.identity);
             explosion.Play();
             Destroy(explosion.gameObject, explosion.main.duration + 1f);
         }
         
-        Collider[] colliders = Physics.OverlapSphere(transform.position, explosionRadius);
+        float finalDamage = damage;
+        if(hitEnemy){
+            finalDamage *= enemyDamageMultiplier;
+        }
+        
+        Collider[] colliders = Physics.OverlapSphere(explosionCenter, explosionRadius);
         foreach(Collider col in colliders){
+            if(col.gameObject == gameObject) continue;
+            if(col.CompareTag("Player")) continue;
             IDamageable damageable = col.GetComponent<IDamageable>();
             if(damageable != null){
-                Vector3 closestPoint = col.ClosestPoint(transform.position);
-                float distance = Vector3.Distance(transform.position, closestPoint);
+                Vector3 closestPoint = col.ClosestPoint(explosionCenter);
+                float distance = Vector3.Distance(explosionCenter, closestPoint);
                 float damageMultiplier = Mathf.Clamp01(1f - (distance / explosionRadius));
-                float actualDamage = damage * Mathf.Max(damageMultiplier, 0.1f);
+                float actualDamage = finalDamage * Mathf.Max(damageMultiplier, 0.1f);
                 damageable.TakeDamage(actualDamage);
             }
         }
@@ -309,20 +334,21 @@ public class MissileController : MonoBehaviour
         if(visualModel != null) visualModel.SetActive(false);
         if(missileCollider != null) missileCollider.enabled = false;
         
+        CameraController.Instance.ShakeCamera(1.5f, 1f, CameraController.ShakePriority.Critical);
         gameObject.SetActive(false);
     }
 
     void OnCollisionEnter(Collision collision){
         if(isExploded || !isActive) return;
         if(collision.gameObject.CompareTag("Player")) return;
+        
         IDamageable damageable = collision.gameObject.GetComponent<IDamageable>();
-        if(damageable != null) Explode();
-    }
-    void OnTriggerEnter(Collider other){
-        if(isExploded || !isActive) return;
-        if(other.CompareTag("Player")) return;
-        IDamageable damageable = other.GetComponent<IDamageable>();
-        if(damageable != null) Explode();
+        if(damageable != null){
+            if(collision.gameObject.layer == LayerMask.NameToLayer("Enemy")){
+                hitEnemy = true;
+            }
+            Explode();
+        }
     }
     
     public bool IsExploded() => isExploded;
@@ -332,6 +358,15 @@ public class MissileController : MonoBehaviour
     public void ManualDismount(){
         if(hasRider) DismountPlayer();
     }
+
+    public void TakeDamage(float amount){
+        health -= amount;
+        if(health <= 0){
+            damage = 0f;
+            Explode();
+        }
+    }
+    public bool IsAlive() => true;
     
     void OnDisable(){
         isActive = false;
@@ -339,5 +374,21 @@ public class MissileController : MonoBehaviour
         
         if(hasRider) DismountPlayer();
         if(targetedBuilding != null && !isExploded) BuildingManager.Instance.SetTargeted(targetedBuilding, false);
+    }
+
+    void OnDrawGizmosSelected(){
+        Vector3 detectionPos = detectionPoint != null ? detectionPoint.position : transform.position;
+        
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(detectionPos, rideDetectionRadius);
+        
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(detectionPos, explosionRadius);
+        
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawRay(detectionPos, transform.forward * (speed * Time.deltaTime + 0.5f));
+        
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(detectionPos, 0.5f);
     }
 }

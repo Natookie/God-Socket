@@ -7,8 +7,9 @@ public class BossController : MonoBehaviour
 {
     [Header("STATE TIMING")]
     public float idleDuration = 2f;
-    public float ufoDuration = 5f;
-    public float missileDuration = 8f;
+    public float initialDelay = 5f;
+    public float ufoDuration = 10f;
+    public float missileDuration = 10f;
     public float gravityDuration = 15f;
     
     [Header("UFO")]
@@ -22,9 +23,12 @@ public class BossController : MonoBehaviour
     [Header("MISSILE")]
     public GameObject missilePrefab;
     public Transform missileParent;
-    public int missilePoolSize = 5;
-    public int missileCount = 3;
+    public int missilePoolSize = 10;
+    public int totalMissilesToSpawn = 7;
+    public int minMissilesPerWave = 1;
+    public int maxMissilesPerWave = 3;
     public float missileSpawnDelay = 1f;
+    public float missileWaveDelay = 2f;
     public Transform missileSpawnPoint;
     
     [Header("GRAVITY FIELD")]
@@ -55,6 +59,9 @@ public class BossController : MonoBehaviour
     
     private float stateTimer = 0f;
     private bool isDefeated = false;
+    private int missilesSpawnedThisPhase = 0;
+    private int stateCounter = 0;
+    private bool hasStarted = false;
     
     private List<GameObject> ufoPool = new List<GameObject>();
     private List<GameObject> missilePool = new List<GameObject>();
@@ -81,15 +88,22 @@ public class BossController : MonoBehaviour
         if(weakpointManager == null) weakpointManager = GetComponent<WeakpointManager>();
         if(bossAimer == null) bossAimer = GetComponent<BossAimer>();
         
-        if(weakpointManager != null){
-            weakpointManager.OnAllWeakPointsDestroyed += OnAllWeakPointsDestroyed;
-        }
-        
-        if(shieldCollider != null) shieldCollider.enabled  = false;
+        if(weakpointManager != null) weakpointManager.OnAllWeakPointsDestroyed += OnAllWeakPointsDestroyed;
+        if(shieldCollider != null) shieldCollider.enabled = false;
         
         currentState = BossState.Idle;
         bossAimer.SetIdle(true);
         stateTimer = 0f;
+        stateCounter = 0;
+        hasStarted = false;
+        
+        StartCoroutine(InitialDelayCoroutine());
+    }
+    
+    IEnumerator InitialDelayCoroutine(){
+        yield return new WaitForSeconds(initialDelay);
+        hasStarted = true;
+        EnterState(GetNextState());
     }
     
     void OnDestroy(){
@@ -126,9 +140,11 @@ public class BossController : MonoBehaviour
         if(enableDebugInput) HandleDebugInput();
         if(disableLogic) return;
 
+        if(!hasStarted) return;
+        
         stateTimer += Time.deltaTime;
-        CheckStateExit();
         CleanupDeadEntities();
+        CheckStateExit();
         UpdateBuildingTargets();
     }
 
@@ -154,37 +170,71 @@ public class BossController : MonoBehaviour
                 break;
                 
             case BossState.UFO:
-                if(stateTimer >= ufoDuration || activeUFOs.Count == 0){
+                if(stateTimer >= ufoDuration && AllUFOsInactive()){
                     ExitState();
-                    EnterState(BossState.Idle);
+                    EnterState(GetNextState());
                 }
                 break;
                 
             case BossState.Missile:
-                if(stateTimer >= missileDuration || activeMissiles.Count == 0){
+                if(missilesSpawnedThisPhase >= totalMissilesToSpawn && AllMissilesInactive()){
                     ExitState();
-                    EnterState(BossState.Idle);
+                    EnterState(GetNextState());
                 }
                 break;
                 
             case BossState.Gravity:
+                if(stateTimer >= gravityDuration){
+                    ExitState();
+                    EnterState(GetNextState());
+                }
                 break;
         }
     }
 
-    BossState GetNextState(){
-        int choice = Random.Range(0, 3);
+    bool AllUFOsInactive(){
+        if(ufoParent == null) return true;
         
-        if(choice == 1 && !HasAvailableBuildings()){
-            choice = Random.Range(0, 2);
-            if(choice == 1) choice = 0;
+        for(int i = 0; i < ufoParent.childCount; i++){
+            Transform child = ufoParent.GetChild(i);
+            if(child.gameObject.activeSelf){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool AllMissilesInactive(){
+        if(missileParent == null) return true;
+        
+        for(int i = 0; i < missileParent.childCount; i++){
+            Transform child = missileParent.GetChild(i);
+            if(child.gameObject.activeSelf){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    BossState GetNextState(){
+        stateCounter++;
+        
+        if(stateCounter % 3 == 0){
+            return BossState.Gravity;
         }
         
-        switch(choice){
-            case 0: return BossState.UFO;
-            case 1: return BossState.Missile;
-            case 2: return BossState.Gravity;
-            default: return BossState.UFO;
+        int choice = Random.Range(0, 2);
+        
+        if(choice == 0){
+            return BossState.UFO;
+        }
+        else{
+            if(HasAvailableBuildings()){
+                return BossState.Missile;
+            }
+            else{
+                return BossState.UFO;
+            }
         }
     }
 
@@ -207,6 +257,7 @@ public class BossController : MonoBehaviour
                 break;
                 
             case BossState.Missile:
+                missilesSpawnedThisPhase = 0;
                 ActivateShield();
                 currentCoroutine = StartCoroutine(MissileCoroutine());
                 bossAimer.SetIdle(false);
@@ -227,16 +278,22 @@ public class BossController : MonoBehaviour
         
         switch(currentState){
             case BossState.UFO:
-                foreach(GameObject ufo in activeUFOs){
-                    if(ufo != null) ufo.SetActive(false);
+                for(int i = 0; i < ufoParent.childCount; i++){
+                    Transform child = ufoParent.GetChild(i);
+                    if(child.gameObject.activeSelf){
+                        child.gameObject.SetActive(false);
+                    }
                 }
                 activeUFOs.Clear();
                 DeactivateShield();
                 break;
                 
             case BossState.Missile:
-                foreach(MissileController missile in activeMissiles){
-                    if(missile != null) missile.gameObject.SetActive(false);
+                for(int i = 0; i < missileParent.childCount; i++){
+                    Transform child = missileParent.GetChild(i);
+                    if(child.gameObject.activeSelf){
+                        child.gameObject.SetActive(false);
+                    }
                 }
                 activeMissiles.Clear();
                 DeactivateShield();
@@ -275,40 +332,46 @@ public class BossController : MonoBehaviour
     }
 
     IEnumerator MissileCoroutine(){
-        int spawned = 0;
-        
-        for(int i = 0; i < missileCount; i++){
-            if(isDefeated) yield break;
-            
-            Building target = GetClosestAvailableBuilding();
-            if(target == null) break;
-            
-            GameObject missileObj = GetPooled(missilePool);
-            if(missileObj != null){
-                if(missileSpawnPoint != null){
-                    missileObj.transform.position = missileSpawnPoint.position;
-                    missileObj.transform.rotation = missileSpawnPoint.rotation;
-                }
-                else{
-                    missileObj.transform.position = transform.position + Vector3.up * 3f + Random.insideUnitSphere * 2f;
-                }
-                missileObj.layer = LayerMask.NameToLayer("EnemyProjectile");
-                missileObj.SetActive(true);
-                
-                MissileController missile = missileObj.GetComponent<MissileController>();
-                if(missile != null){
-                    missile.Initialize(target);
-                    activeMissiles.Add(missile);
-                    spawned++;
-                }
+        while(missilesSpawnedThisPhase < totalMissilesToSpawn && !isDefeated){
+            if(!HasAvailableBuildings()){
+                yield break;
             }
             
-            yield return new WaitForSeconds(missileSpawnDelay);
-        }
-        
-        if(spawned == 0){
-            ExitState();
-            EnterState(BossState.Idle);
+            int missilesInWave = Random.Range(minMissilesPerWave, maxMissilesPerWave + 1);
+            missilesInWave = Mathf.Min(missilesInWave, totalMissilesToSpawn - missilesSpawnedThisPhase);
+            
+            for(int i = 0; i < missilesInWave; i++){
+                if(isDefeated) yield break;
+                
+                Building target = GetRandomAvailableBuilding();
+                if(target == null){
+                    yield break;
+                }
+                
+                GameObject missileObj = GetPooled(missilePool);
+                if(missileObj != null){
+                    if(missileSpawnPoint != null){
+                        missileObj.transform.position = missileSpawnPoint.position;
+                        missileObj.transform.rotation = missileSpawnPoint.rotation;
+                    }
+                    else{
+                        missileObj.transform.position = transform.position + Vector3.up * 3f + Random.insideUnitSphere * 2f;
+                    }
+                    missileObj.layer = LayerMask.NameToLayer("EnemyProjectile");
+                    missileObj.SetActive(true);
+                    
+                    MissileController missile = missileObj.GetComponent<MissileController>();
+                    if(missile != null){
+                        missile.Initialize(target);
+                        activeMissiles.Add(missile);
+                    }
+                }
+                
+                missilesSpawnedThisPhase++;
+                yield return new WaitForSeconds(missileSpawnDelay);
+            }
+            
+            yield return new WaitForSeconds(missileWaveDelay);
         }
     }
 
@@ -326,7 +389,7 @@ public class BossController : MonoBehaviour
         if(!isDefeated){
             WeakpointController chargingWeakpoint = weakpointManager.weakPoints[0];
             Vector3 origin = chargingWeakpoint.GetLaserOrigin();
-            Vector3 direction = -chargingWeakpoint.transform.forward;
+            Vector3 direction = chargingWeakpoint.transform.forward;
             ActivateLaserFromWeakpoint(origin, direction);
             
             float laserTimer = 0f;
@@ -342,7 +405,7 @@ public class BossController : MonoBehaviour
         
         if(!isDefeated){
             ExitState();
-            EnterState(BossState.Idle);
+            EnterState(GetNextState());
         }
     }
 
@@ -378,11 +441,10 @@ public class BossController : MonoBehaviour
         return false;
     }
     
-    Building GetClosestAvailableBuilding(){
+    Building GetRandomAvailableBuilding(){
         if(BuildingManager.Instance == null) return null;
         
-        Building closest = null;
-        float closestDistance = float.MaxValue;
+        List<Building> availableBuildings = new List<Building>();
         
         foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
             Building building = kvp.Key;
@@ -392,14 +454,13 @@ public class BossController : MonoBehaviour
             if(!building.IsAlive()) continue;
             if(state == BuildingState.Destroyed) continue;
             
-            float distance = Vector3.Distance(transform.position, building.transform.position);
-            if(distance < closestDistance){
-                closestDistance = distance;
-                closest = building;
-            }
+            availableBuildings.Add(building);
         }
         
-        return closest;
+        if(availableBuildings.Count == 0) return null;
+        
+        int randomIndex = Random.Range(0, availableBuildings.Count);
+        return availableBuildings[randomIndex];
     }
     
     void UpdateBuildingTargets(){
@@ -422,8 +483,25 @@ public class BossController : MonoBehaviour
     }
     
     void CleanupDeadEntities(){
-        activeUFOs.RemoveAll(u => u == null || !u.activeInHierarchy);
-        activeMissiles.RemoveAll(m => m == null || m.IsExploded());
+        List<GameObject> ufoToRemove = new List<GameObject>();
+        foreach(GameObject ufo in activeUFOs){
+            if(ufo == null || !ufo.activeInHierarchy){
+                ufoToRemove.Add(ufo);
+            }
+        }
+        foreach(GameObject ufo in ufoToRemove){
+            activeUFOs.Remove(ufo);
+        }
+        
+        List<MissileController> missileToRemove = new List<MissileController>();
+        foreach(MissileController missile in activeMissiles){
+            if(missile == null || missile.IsExploded() || !missile.gameObject.activeInHierarchy){
+                missileToRemove.Add(missile);
+            }
+        }
+        foreach(MissileController missile in missileToRemove){
+            activeMissiles.Remove(missile);
+        }
         
         ufoPool.RemoveAll(obj => obj == null);
         missilePool.RemoveAll(obj => obj == null);
@@ -448,7 +526,7 @@ public class BossController : MonoBehaviour
     
     void ActivateShield(){
         isShieldActive = true;
-        if(shieldCollider != null) shieldCollider.enabled = true;;
+        if(shieldCollider != null) shieldCollider.enabled = true;
         if(shieldSystem != null){
             shieldSystem.ShowShield();
             shieldSystem.SetDamageMultiplier(shieldDamageMultiplier);
@@ -467,7 +545,7 @@ public class BossController : MonoBehaviour
     void OnAllWeakPointsDestroyed(){
         if(currentState == BossState.Gravity){
             ExitState();
-            EnterState(BossState.Idle);
+            EnterState(GetNextState());
         }
     }
     
@@ -496,13 +574,19 @@ public class BossController : MonoBehaviour
             currentCoroutine = null;
         }
         
-        foreach(GameObject ufo in activeUFOs){
-            if(ufo != null) ufo.SetActive(false);
+        for(int i = 0; i < ufoParent.childCount; i++){
+            Transform child = ufoParent.GetChild(i);
+            if(child.gameObject.activeSelf){
+                child.gameObject.SetActive(false);
+            }
         }
         activeUFOs.Clear();
         
-        foreach(MissileController missile in activeMissiles){
-            if(missile != null) missile.gameObject.SetActive(false);
+        for(int i = 0; i < missileParent.childCount; i++){
+            Transform child = missileParent.GetChild(i);
+            if(child.gameObject.activeSelf){
+                child.gameObject.SetActive(false);
+            }
         }
         activeMissiles.Clear();
         

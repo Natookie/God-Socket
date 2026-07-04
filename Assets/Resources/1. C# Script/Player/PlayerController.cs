@@ -11,6 +11,8 @@ public enum PlayerState
 
 public class PlayerController : MonoBehaviour, IDamageable
 {
+    public static PlayerController Instance {get; private set;}
+
     [Header("STATE")]
     public PlayerState currentState = PlayerState.Normal;
 
@@ -25,6 +27,9 @@ public class PlayerController : MonoBehaviour, IDamageable
     private bool cursorModeActive;
 
     void Awake(){
+        if(Instance == null) Instance = this;
+        else return;
+
         if(!input) input = GetComponent<InputHandler>();
         if(!energy) energy = GetComponent<EnergySystem>();
         if(!movement) movement = GetComponent<MovementController>();
@@ -89,6 +94,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         if(overheatRoutine != null) StopCoroutine(overheatRoutine);
         overheatRoutine = StartCoroutine(OverheatCooldown());
     }
+    public bool IsOverheat() => currentState == PlayerState.Overheated;
 
     IEnumerator OverheatCooldown(){
         yield return new WaitForSeconds(energy.overheatCooldown);
@@ -102,11 +108,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         currentState = PlayerState.Normal;
     }
 
-    public void TakeDamage(float damage){
-        if(currentState == PlayerState.Overheated) return;
-        energy.Consume(damage);
-    }
-
+    public void TakeDamage(float damage) => energy.Consume(damage);
     public bool IsAlive() => true;
 
     void OnDestroy(){
