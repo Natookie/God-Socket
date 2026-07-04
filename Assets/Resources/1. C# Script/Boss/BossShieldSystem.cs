@@ -17,6 +17,7 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
     [SerializeField] private float maxFade = 1f;
 
     [Header("REFERENCES")]
+    public SphereCollider shieldCollider;
     public BossHealthSystem healthSystem;
     public Renderer shieldRenderer;
     public AudioSource audioSource;
@@ -33,7 +34,7 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
         
         currentFade = minFade;
         SetFade(currentFade);
-        gameObject.SetActive(false);
+        shieldCollider.enabled = false;
     }
 
     public void TakeDamage(float damage){
@@ -53,9 +54,8 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
 
     public void ShowShield(){
         if(fadeCoroutine != null) StopCoroutine(fadeCoroutine);
-        gameObject.SetActive(true);
+        shieldCollider.enabled = true;
         fadeCoroutine = StartCoroutine(FadeCoroutine(maxFade));
-        Debug.Log("called");
     }
 
     public void HideShield(){
@@ -65,14 +65,14 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
 
     public void InstantShowShield(){
         if(fadeCoroutine != null) StopCoroutine(fadeCoroutine);
-        gameObject.SetActive(true);
+        shieldCollider.enabled = true;
         SetFade(maxFade);
     }
 
     public void InstantHideShield(){
         if(fadeCoroutine != null) StopCoroutine(fadeCoroutine);
         SetFade(minFade);
-        gameObject.SetActive(false);
+        shieldCollider.enabled = false;
     }
 
     void SetFade(float fade){
@@ -88,7 +88,6 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
     IEnumerator FadeCoroutine(float targetFade, bool deactivateOnComplete = false){
         float startFade = GetCurrentFade();
         float elapsed = 0f;
-        Debug.Log("called2");
 
         while(elapsed < fadeDuration){
             elapsed += Time.deltaTime;
@@ -98,11 +97,10 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
             SetFade(currentFade);
             yield return null;
         }
-        Debug.Log("called3");
 
         SetFade(targetFade);
 
-        if(deactivateOnComplete) gameObject.SetActive(false);
+        if(deactivateOnComplete) shieldCollider.enabled = false;
         fadeCoroutine = null;
     }
 }

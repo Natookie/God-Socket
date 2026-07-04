@@ -16,7 +16,6 @@ public class LaserFieldController : MonoBehaviour
     
     private List<LaserBeam> activeLasers = new List<LaserBeam>();
     private bool isActive = false;
-    private BossAimer bossAimer;
 
     private class LaserBeam
     {
@@ -28,9 +27,7 @@ public class LaserFieldController : MonoBehaviour
         public float maxLength;
         public bool isExpanding;
         public List<IDamageable> damagedTargets = new List<IDamageable>();
-        public Vector3 hitPoint;
-        public bool hasHit;
-        public RaycastHit hitInfo;
+        public Building targetBuilding;
         
         public LaserBeam(GameObject obj, Vector3 start, Vector3 dir, float maxLen){
             gameObject = obj;
@@ -41,14 +38,11 @@ public class LaserFieldController : MonoBehaviour
             currentLength = 0.1f;
             isExpanding = true;
             damagedTargets.Clear();
-            hitPoint = start;
-            hasHit = false;
+            targetBuilding = null;
         }
     }
     
     void Start(){
-        bossAimer = GetComponentInParent<BossAimer>();
-        
         if(laserMaterial == null){
             laserMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
             if(laserMaterial == null){
@@ -60,55 +54,46 @@ public class LaserFieldController : MonoBehaviour
         }
     }
     
-    public void ActivateLasers(List<Vector3> origins){
+    public void ActivateSingleLaser(Vector3 origin, Vector3 direction, Building target){
         isActive = true;
-        SpawnLasers(origins);
+        ClearLasers();
+        
+        GameObject laserObj = new GameObject($"Laser_Single");
+        laserObj.transform.position = origin;
+        laserObj.transform.parent = transform;
+        
+        LineRenderer line = laserObj.AddComponent<LineRenderer>();
+        line.startWidth = laserWidth;
+        line.endWidth = laserWidth;
+        
+        if(laserMaterial != null){
+            line.material = laserMaterial;
+        }
+        else{
+            line.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            if(line.material == null){
+                line.material = new Material(Shader.Find("Sprites/Default"));
+            }
+        }
+        
+        line.startColor = laserStartColor;
+        line.endColor = laserEndColor;
+        line.positionCount = 2;
+        line.useWorldSpace = true;
+        
+        Vector3 initialEnd = origin + direction * 0.1f;
+        line.SetPosition(0, origin);
+        line.SetPosition(1, initialEnd);
+        
+        LaserBeam beam = new LaserBeam(laserObj, origin, direction, maxLaserLength);
+        beam.currentLength = 0.1f;
+        beam.targetBuilding = target;
+        activeLasers.Add(beam);
     }
     
     public void DeactivateLasers(){
         isActive = false;
         ClearLasers();
-    }
-    
-    void SpawnLasers(List<Vector3> origins){
-        ClearLasers();
-        
-        if(bossAimer == null) return;
-        
-        Vector3 direction = bossAimer.GetAimDirection();
-        
-        foreach(Vector3 spawnPos in origins){
-            GameObject laserObj = new GameObject($"Laser_{activeLasers.Count}");
-            laserObj.transform.position = spawnPos;
-            laserObj.transform.parent = transform;
-            
-            LineRenderer line = laserObj.AddComponent<LineRenderer>();
-            line.startWidth = laserWidth;
-            line.endWidth = laserWidth;
-            
-            if(laserMaterial != null){
-                line.material = laserMaterial;
-            }
-            else{
-                line.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                if(line.material == null){
-                    line.material = new Material(Shader.Find("Sprites/Default"));
-                }
-            }
-            
-            line.startColor = laserStartColor;
-            line.endColor = laserEndColor;
-            line.positionCount = 2;
-            line.useWorldSpace = true;
-            
-            Vector3 initialEnd = spawnPos + direction * 0.1f;
-            line.SetPosition(0, spawnPos);
-            line.SetPosition(1, initialEnd);
-            
-            LaserBeam beam = new LaserBeam(laserObj, spawnPos, direction, maxLaserLength);
-            beam.currentLength = 0.1f;
-            activeLasers.Add(beam);
-        }
     }
     
     void ClearLasers(){
@@ -123,12 +108,8 @@ public class LaserFieldController : MonoBehaviour
     void Update(){
         if(!isActive) return;
         
-        Vector3 direction = bossAimer != null ? bossAimer.GetAimDirection() : Vector3.forward;
-        
         foreach(LaserBeam beam in activeLasers){
             if(beam.gameObject == null) continue;
-            
-            beam.direction = direction;
             
             if(beam.isExpanding){
                 beam.currentLength += laserExpandSpeed * Time.deltaTime;
@@ -141,17 +122,16 @@ public class LaserFieldController : MonoBehaviour
                     beam.currentLength,
                     buildingLayer
                 )){
-                    beam.hasHit = true;
-                    beam.hitPoint = hit.point;
-                    beam.hitInfo = hit;
                     beam.currentLength = hit.distance;
                     beam.isExpanding = false;
                     
-                    IDamageable damageable = hit.collider.GetComponent<IDamageable>();
-                    if(damageable != null){
-                        damageable.TakeDamage(laserDamage * Time.deltaTime);
-                        if(!beam.damagedTargets.Contains(damageable)){
-                            beam.damagedTargets.Add(damageable);
+                    if(beam.targetBuilding != null){
+                        IDamageable damageable = beam.targetBuilding.GetComponent<IDamageable>();
+                        if(damageable != null){
+                            damageable.TakeDamage(laserDamage * Time.deltaTime);
+                            if(!beam.damagedTargets.Contains(damageable)){
+                                beam.damagedTargets.Add(damageable);
+                            }
                         }
                     }
                     
@@ -175,16 +155,15 @@ public class LaserFieldController : MonoBehaviour
                     beam.currentLength,
                     buildingLayer
                 )){
-                    beam.hasHit = true;
-                    beam.hitPoint = hit.point;
-                    beam.hitInfo = hit;
                     beam.currentLength = hit.distance;
                     
-                    IDamageable damageable = hit.collider.GetComponent<IDamageable>();
-                    if(damageable != null){
-                        damageable.TakeDamage(laserDamage * Time.deltaTime);
-                        if(!beam.damagedTargets.Contains(damageable)){
-                            beam.damagedTargets.Add(damageable);
+                    if(beam.targetBuilding != null){
+                        IDamageable damageable = beam.targetBuilding.GetComponent<IDamageable>();
+                        if(damageable != null){
+                            damageable.TakeDamage(laserDamage * Time.deltaTime);
+                            if(!beam.damagedTargets.Contains(damageable)){
+                                beam.damagedTargets.Add(damageable);
+                            }
                         }
                     }
                     

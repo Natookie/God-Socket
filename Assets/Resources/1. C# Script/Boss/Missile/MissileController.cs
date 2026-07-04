@@ -208,7 +208,6 @@ public class MissileController : MonoBehaviour
     
     void DismountPlayer(){
         if(!hasRider || rider == null) return;
-        
         straightDirection = transform.forward;
         isGoingStraight = true;
         gameObject.layer = LayerMask.NameToLayer("Projectile");

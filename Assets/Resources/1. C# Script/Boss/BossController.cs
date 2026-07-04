@@ -50,9 +50,9 @@ public class BossController : MonoBehaviour
     [Header("DEBUG")]
     [SerializeField] private bool disableLogic;
     [SerializeField] private bool enableDebugInput;
+    public enum BossState { Idle, UFO, Missile, Gravity }
+    [ReadOnly] public BossState currentState = BossState.Idle;
     
-    private enum BossState { Idle, UFO, Missile, Gravity }
-    private BossState currentState = BossState.Idle;
     private float stateTimer = 0f;
     private bool isDefeated = false;
     
@@ -88,6 +88,7 @@ public class BossController : MonoBehaviour
         if(shieldCollider != null) shieldCollider.enabled  = false;
         
         currentState = BossState.Idle;
+        bossAimer.SetIdle(true);
         stateTimer = 0f;
     }
     
@@ -196,16 +197,19 @@ public class BossController : MonoBehaviour
         switch(newState){
             case BossState.Idle:
                 DeactivateShield();
+                bossAimer.SetIdle(true);
                 break;
                 
             case BossState.UFO:
                 ActivateShield();
                 currentCoroutine = StartCoroutine(UFOCoroutine());
+                bossAimer.SetIdle(false);
                 break;
                 
             case BossState.Missile:
                 ActivateShield();
                 currentCoroutine = StartCoroutine(MissileCoroutine());
+                bossAimer.SetIdle(false);
                 break;
                 
             case BossState.Gravity:
@@ -310,6 +314,8 @@ public class BossController : MonoBehaviour
 
     IEnumerator GravityCoroutine(){
         ActivateGravity();
+        yield return new WaitForEndOfFrame();
+        bossAimer.AimGravity();
         
         float chargeTimer = 0f;
         while(chargeTimer < chargeTime && !isDefeated){
@@ -318,7 +324,10 @@ public class BossController : MonoBehaviour
         }
         
         if(!isDefeated){
-            ActivateLasers();
+            WeakpointController chargingWeakpoint = weakpointManager.weakPoints[0];
+            Vector3 origin = chargingWeakpoint.GetLaserOrigin();
+            Vector3 direction = -chargingWeakpoint.transform.forward;
+            ActivateLaserFromWeakpoint(origin, direction);
             
             float laserTimer = 0f;
             while(laserTimer < laserDuration && !isDefeated){
@@ -334,6 +343,13 @@ public class BossController : MonoBehaviour
         if(!isDefeated){
             ExitState();
             EnterState(BossState.Idle);
+        }
+    }
+
+    void ActivateLaserFromWeakpoint(Vector3 origin, Vector3 direction){
+        isLaserActive = true;
+        if(laserFieldController != null){
+            laserFieldController.ActivateSingleLaser(origin, direction, null);
         }
     }
 
@@ -423,14 +439,6 @@ public class BossController : MonoBehaviour
         isGravityActive = false;
         if(gravityFieldController != null) gravityFieldController.Deactivate();
         if(weakpointManager != null) weakpointManager.DeactivateAll();
-    }
-    
-    void ActivateLasers(){
-        isLaserActive = true;
-        if(laserFieldController != null && weakpointManager != null){
-            List<Vector3> origins = weakpointManager.GetLaserOrigins();
-            laserFieldController.ActivateLasers(origins);
-        }
     }
     
     void DeactivateLasers(){

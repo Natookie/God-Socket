@@ -6,16 +6,24 @@ public class BossAimer : MonoBehaviour
 {
     [Header("TARGETING")]
     public float rotationSpeed = 90f;
-    public float aimOffset = 0f;
+    public float idleRotationSpeed = 30f;
+    
+    [Header("GRAVITY AIM")]
+    public Vector3 gravityAimRotation = new Vector3(-95, 0f, 0f);
     
     [Header("DEBUG")]
     public bool showDebugLogs = true;
     public GameObject debugTargetObject;
     
     private Transform target;
-    private Quaternion targetRotation;
     private Building targetedBuilding;
     private bool hasTarget = false;
+    private float idleAngle = 0f;
+    [ReadOnly] public bool isIdle = true;
+    private Quaternion targetRotation;
+    private bool isGravityAiming = false;
+
+    private const float DEFAULT_X_ROT = -90f;
     
     void Start(){
         targetRotation = transform.rotation;
@@ -23,6 +31,29 @@ public class BossAimer : MonoBehaviour
     }
     
     void Update(){
+        if(isIdle){
+            idleAngle += idleRotationSpeed * Time.deltaTime;
+            if(idleAngle > 360f) idleAngle -= 360f;
+            
+            Quaternion idleRot = Quaternion.Euler(DEFAULT_X_ROT, idleAngle, 0f);
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                idleRot,
+                idleRotationSpeed * Time.deltaTime
+            );
+            return;
+        }
+        
+        if(isGravityAiming){
+            Quaternion gravityRot = Quaternion.Euler(gravityAimRotation);
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                gravityRot,
+                rotationSpeed * Time.deltaTime
+            );
+            return;
+        }
+        
         if(hasTarget && target != null){
             Building building = target.GetComponent<Building>();
             
@@ -33,25 +64,36 @@ public class BossAimer : MonoBehaviour
                 return;
             }
             
-            Vector3 direction = target.position - transform.position;
-            direction.y = 0f;
-            
-            if(direction.magnitude > 0.1f){
-                targetRotation = Quaternion.LookRotation(direction);
-                transform.rotation = Quaternion.RotateTowards(
-                    transform.rotation,
-                    targetRotation,
-                    rotationSpeed * Time.deltaTime
-                );
-            }
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                targetRotation,
+                rotationSpeed * Time.deltaTime
+            );
             
             debugTargetObject = target.gameObject;
             return;
         }
         
-        if(!hasTarget || target == null){
-            if(showDebugLogs) Debug.Log("BossAimer: No target, finding nearest...");
-            FindNearestTarget();
+        if(!hasTarget || target == null) FindNearestTarget();
+    }
+    
+    public void AimGravity(){
+        ClearTarget();
+        isIdle = false;
+        isGravityAiming = true;
+        if(showDebugLogs) Debug.Log($"BossAimer: Aiming gravity rotation to {gravityAimRotation}");
+    }
+    
+    void CalculateTargetRotation(Building building){
+        Vector3 direction = building.transform.position - transform.position;
+        
+        if(direction.magnitude > 0.1f){
+            Quaternion lookRotation = Quaternion.LookRotation(direction.normalized);
+            Vector3 euler = lookRotation.eulerAngles;
+            float xOffset = Mathf.DeltaAngle(DEFAULT_X_ROT, euler.x);
+            euler.x = DEFAULT_X_ROT + Mathf.Clamp(xOffset, -10f, 10f);
+            euler.z = 0f;
+            targetRotation = Quaternion.Euler(euler);
         }
     }
     
@@ -97,13 +139,17 @@ public class BossAimer : MonoBehaviour
             target = nearest.transform;
             targetedBuilding = nearest;
             hasTarget = true;
+            isIdle = false;
+            isGravityAiming = false;
             
+            CalculateTargetRotation(nearest);
             BuildingManager.Instance.SetTargeted(nearest, true);
             if(showDebugLogs) Debug.Log($"BossAimer: NOW Targeting {nearest.name} at distance {nearestDistance}");
         }
         else{
             if(showDebugLogs) Debug.LogWarning("BossAimer: No available buildings found to target!");
             ClearTarget();
+            isIdle = true;
         }
     }
     
@@ -117,14 +163,27 @@ public class BossAimer : MonoBehaviour
         targetedBuilding = null;
         hasTarget = false;
         debugTargetObject = null;
+        isGravityAiming = false;
+        targetRotation = transform.rotation;
+    }
+    
+    public void SetIdle(bool idle){
+        isIdle = idle;
+        isGravityAiming = false;
+        if(idle) ClearTarget();
+        else FindNearestTarget();
     }
     
     public Vector3 GetAimDirection() => transform.forward;
     public Transform GetTarget() => target;
     public bool HasTarget() => hasTarget && target != null;
+    public bool IsIdle() => isIdle;
     
     public void ResetAiming(){
         ClearTarget();
+        isIdle = true;
+        isGravityAiming = false;
+        targetRotation = transform.rotation;
         if(showDebugLogs) Debug.Log("BossAimer: Aiming reset");
     }
     
