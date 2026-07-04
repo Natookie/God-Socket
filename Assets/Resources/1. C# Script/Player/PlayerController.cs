@@ -9,7 +9,7 @@ public enum PlayerState
     Overheated
 }
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviour, IDamageable
 {
     [Header("STATE")]
     public PlayerState currentState = PlayerState.Normal;
@@ -101,6 +101,13 @@ public class PlayerController : MonoBehaviour
         playerRotation.SetInputDisabled(false);
         currentState = PlayerState.Normal;
     }
+
+    public void TakeDamage(float damage){
+        if(currentState == PlayerState.Overheated) return;
+        energy.Consume(damage);
+    }
+
+    public bool IsAlive() => true;
 
     void OnDestroy(){
         energy.OnEnergyDepleted -= HandleEnergyDepleted;

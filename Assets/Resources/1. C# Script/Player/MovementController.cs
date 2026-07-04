@@ -29,6 +29,10 @@ public class MovementController : MonoBehaviour
     private bool isOverheated;
     private bool boostActive;
     private bool inputDisabled;
+    private bool wasAiming;
+    private bool isRiding = false;
+    private MissileController ridingMissile;
+    private Vector3 lastWorldMoveDirection;
 
     public Vector3 WorldMoveDirection { get; private set; }
 
@@ -37,9 +41,58 @@ public class MovementController : MonoBehaviour
         if(overheated) rb.linearVelocity = Vector3.zero;
     }
 
-    public void SetBoostActive(bool active) => boostActive = active;
+    public void SetBoostActive(bool active){
+        boostActive = active;
+        if(!active && wasAiming && input != null && input.AimHeld){
+            wasAiming = false;
+        }
+    }
+
     public void SetInputDisabled(bool disabled) => inputDisabled = disabled;
     public float GetCurrentSpeed() => rb.linearVelocity.magnitude;
+    public bool IsRiding() => isRiding;
+    public bool IsOverheated() => isOverheated;
+
+    public void SetRiding(bool riding){
+        isRiding = riding;
+        if(riding){
+            inputDisabled = true;
+            rb.isKinematic = true;
+        }
+        else{
+            inputDisabled = false;
+            rb.isKinematic = false;
+        }
+    }
+
+    public void SetRidingMissile(MissileController missile){
+        ridingMissile = missile;
+    }
+
+    public Vector3 GetWorldMoveDirection(){
+        if(isRiding && ridingMissile != null){
+            Vector3 moveInput = input.MoveDirection;
+            if(moveInput.sqrMagnitude > 0.01f){
+                Vector3 camForward = cameraTransform.forward;
+                Vector3 camRight = cameraTransform.right;
+                
+                Vector3 forward = camForward.normalized;
+                Vector3 right = Vector3.ProjectOnPlane(camRight, Vector3.up).normalized;
+                Vector3 up = Vector3.up;
+                
+                lastWorldMoveDirection = forward * moveInput.z + right * moveInput.x + up * moveInput.y;
+                return lastWorldMoveDirection.normalized;
+            }
+            return lastWorldMoveDirection;
+        }
+        return WorldMoveDirection;
+    }
+
+    public void DismountMissile(){
+        if(isRiding && ridingMissile != null){
+            ridingMissile.ManualDismount();
+        }
+    }
 
     void Awake(){
         rb = GetComponent<Rigidbody>();
@@ -56,9 +109,16 @@ public class MovementController : MonoBehaviour
 
         HandleMovement();
 
-        if(boostActive && !isOverheated && !CameraController.Instance.aiming){
+        bool isAiming = input != null && input.AimHeld;
+
+        if(isAiming != wasAiming){
+            wasAiming = isAiming;
+            if(!isAiming) boostActive = false;
+        }
+
+        if(boostActive && !isOverheated && !isAiming){
             float currentMaxSpeed = boostActive ? normalMaxSpeed * boostSpeedMultiplier : normalMaxSpeed;
-            if(input.AimHeld) currentMaxSpeed *= aimMovementMultiplier;
+            if(isAiming) currentMaxSpeed *= aimMovementMultiplier;
             
             float speedRatio = rb.linearVelocity.magnitude / currentMaxSpeed;
             float boostThreshold = boostActive ? 0.4f : 0.5f;
@@ -68,6 +128,8 @@ public class MovementController : MonoBehaviour
     }
 
     void HandleMovement(){
+        if(isRiding) return;
+        
         Vector3 moveInput = input.MoveDirection;
 
         Vector3 camForward = cameraTransform.forward;

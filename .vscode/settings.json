@@ -66,5 +66,5 @@
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj"
     },
-    "dotnet.defaultSolution": "God-Socket.sln"
+    "dotnet.defaultSolution": "God Socket.sln"
 }

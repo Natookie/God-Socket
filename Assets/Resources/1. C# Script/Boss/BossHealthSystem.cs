@@ -19,7 +19,7 @@ public class BossHealthSystem : MonoBehaviour, IDamageable
 
     public void TakeDamage(float damage){
         if(currentHealth <= 0f) return;
-        
+
         currentHealth -= damage;
         bossUI.UpdateUI(currentHealth/maxHealth);
 

@@ -34,18 +34,13 @@ public class PlayerRotation : MonoBehaviour
     public float CurrentYawRate { get; private set; }
     private float previousYaw;
 
-    void Awake()
-    {
+    void Awake(){
         rb = GetComponent<Rigidbody>();
 
         Vector3 angles = transform.rotation.eulerAngles;
         yaw = angles.y;
         pitch = angles.x;
-
-        if (pitch > 180f)
-        {
-            pitch -= 360f;
-        }
+        if(pitch > 180f) pitch -= 360f;
 
         previousYaw = yaw;
         autoAimActive = false;
@@ -53,35 +48,23 @@ public class PlayerRotation : MonoBehaviour
         isAutoAimTransitioning = false;
     }
 
-    void Start()
-    {
+    void Start(){
         LoadSensitivity();
     }
 
-    public void LoadSensitivity()
-    {
+    public void LoadSensitivity(){
         mouseSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", defaultSensitivity);
-
-        // defaultSensitivity = normal speed
-        // Example:
-        // saved 2 = normal
-        // saved 4 = 2x faster
-        // saved 1 = 0.5x slower
         sensitivityMultiplier = mouseSensitivity / defaultSensitivity;
-
-        Debug.Log("Loaded Mouse Sensitivity: " + mouseSensitivity);
-        Debug.Log("Sensitivity Multiplier: " + sensitivityMultiplier);
+        // Debug.Log("Loaded Mouse Sensitivity: " + mouseSensitivity);
+        // Debug.Log("Sensitivity Multiplier: " + sensitivityMultiplier);
     }
 
-    public void SetInputDisabled(bool disabled)
-    {
+    public void SetInputDisabled(bool disabled){
         inputDisabled = disabled;
     }
 
-    public void SetAutoAimTarget(Quaternion target)
-    {
-        if (!autoAimActive || Quaternion.Angle(autoAimTarget, target) > 5f)
-        {
+    public void SetAutoAimTarget(Quaternion target){
+        if(!autoAimActive || Quaternion.Angle(autoAimTarget, target) > 5f){
             autoAimStartRotation = transform.rotation;
             autoAimStartTime = Time.time;
             isAutoAimTransitioning = true;
@@ -91,83 +74,68 @@ public class PlayerRotation : MonoBehaviour
         autoAimActive = true;
     }
 
-    public void ClearAutoAim()
-    {
+    public void ClearAutoAim(){
         autoAimActive = false;
         autoAimTarget = Quaternion.identity;
         isAutoAimTransitioning = false;
     }
 
-    void FixedUpdate()
-    {
-        if (input == null) return;
-        if (input.CursorVisible) return;
+    public bool IsAutoAiming() => autoAimActive;
 
-        if (autoAimActive)
-        {
-            Vector3 currentEuler = transform.rotation.eulerAngles;
-            float currentYaw = currentEuler.y;
-            float currentPitch = currentEuler.x;
+    void FixedUpdate(){
+        if(input == null) return;
+        if(input.CursorVisible) return;
 
-            if (currentPitch > 180f)
-            {
-                currentPitch -= 360f;
-            }
-
-            Vector3 targetEuler = autoAimTarget.eulerAngles;
-            float targetYaw = targetEuler.y;
-            float targetPitch = targetEuler.x;
-
-            if (targetPitch > 180f)
-            {
-                targetPitch -= 360f;
-            }
-
-            float speed;
-
-            if (isAutoAimTransitioning)
-            {
-                float transitionProgress = (Time.time - autoAimStartTime) / 0.3f;
-                transitionProgress = Mathf.Clamp01(transitionProgress);
-
-                float easedProgress = 1f - Mathf.Pow(1f - transitionProgress, 3f);
-
-                speed = Mathf.Lerp(autoAimTransitionSpeed, autoAimSpeed, easedProgress);
-
-                if (transitionProgress >= 1f)
-                {
-                    isAutoAimTransitioning = false;
-                }
-            }
-            else
-            {
-                speed = autoAimSpeed;
-            }
-
-            float newYaw = Mathf.LerpAngle(currentYaw, targetYaw, Time.fixedDeltaTime * speed);
-            float newPitch = Mathf.Lerp(currentPitch, targetPitch, Time.fixedDeltaTime * speed * 0.5f);
-            newPitch = Mathf.Clamp(newPitch, minPitch, maxPitch);
-
-            Quaternion targetRotation = Quaternion.Euler(newPitch, newYaw, 0f);
-            rb.MoveRotation(targetRotation);
-
-            float deltaYaw = Mathf.DeltaAngle(previousYaw, newYaw);
-            CurrentYawRate = deltaYaw / Time.fixedDeltaTime;
-            previousYaw = newYaw;
-
-            yaw = newYaw;
-            pitch = newPitch;
+        if(autoAimActive){
+            UpdateAutoAim();
             return;
         }
 
-        if (!inputDisabled)
-        {
-            UpdateRotation();
-        }
+        if(!inputDisabled) UpdateRotation();
     }
 
-    void UpdateRotation()
-    {
+    void UpdateAutoAim(){
+        Vector3 currentEuler = transform.rotation.eulerAngles;
+        float currentYaw = currentEuler.y;
+        float currentPitch = currentEuler.x;
+
+        if(currentPitch > 180f) currentPitch -= 360f;
+
+        Vector3 targetEuler = autoAimTarget.eulerAngles;
+        float targetYaw = targetEuler.y;
+        float targetPitch = targetEuler.x;
+
+        if(targetPitch > 180f) targetPitch -= 360f;
+
+        float speed;
+
+        if(isAutoAimTransitioning){
+            float transitionProgress = (Time.time - autoAimStartTime) / 0.3f;
+            transitionProgress = Mathf.Clamp01(transitionProgress);
+
+            float easedProgress = 1f - Mathf.Pow(1f - transitionProgress, 3f);
+
+            speed = Mathf.Lerp(autoAimTransitionSpeed, autoAimSpeed, easedProgress);
+            if(transitionProgress >= 1f) isAutoAimTransitioning = false;
+        }
+        else speed = autoAimSpeed;
+
+        float newYaw = Mathf.LerpAngle(currentYaw, targetYaw, Time.fixedDeltaTime * speed);
+        float newPitch = Mathf.Lerp(currentPitch, targetPitch, Time.fixedDeltaTime * speed * 0.5f);
+        newPitch = Mathf.Clamp(newPitch, minPitch, maxPitch);
+
+        Quaternion targetRotation = Quaternion.Euler(newPitch, newYaw, 0f);
+        rb.MoveRotation(targetRotation);
+
+        float deltaYaw = Mathf.DeltaAngle(previousYaw, newYaw);
+        CurrentYawRate = deltaYaw / Time.fixedDeltaTime;
+        previousYaw = newYaw;
+
+        yaw = newYaw;
+        pitch = newPitch;
+    }
+
+    void UpdateRotation(){
         yaw += input.MouseX * yawSpeed * sensitivityMultiplier * Time.fixedDeltaTime;
         pitch -= input.MouseY * pitchSpeed * sensitivityMultiplier * Time.fixedDeltaTime;
 

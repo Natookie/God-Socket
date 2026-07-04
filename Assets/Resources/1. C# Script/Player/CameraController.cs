@@ -17,6 +17,7 @@ public class CameraController : MonoBehaviour
     public InputHandler input;
     public PlayerRotation playerRotation;
     public MovementController movement;
+    public CameraAutoAim autoAim;
 
     [Header("PRIORITIES")]
     public int activePriority = 20;
@@ -26,14 +27,6 @@ public class CameraController : MonoBehaviour
     public float maxDutch = 5f;
     public float yawRateForMaxDutch = 360f;
     public float dutchSmoothSpeed = 8f;
-
-    [Header("AUTO AIM")]
-    public bool enableAutoAim = true;
-    public float autoAimRange = 50f;
-    public LayerMask enemyLayer = 1 << 6;
-    public float maxAimAngle = 60f;
-    public float minAimDistance = 2f;
-    public float obstructionCheckRadius = 0.5f;
 
     [Header("CAMERA OFFSET")]
     public Transform cameraTransform;
@@ -53,25 +46,13 @@ public class CameraController : MonoBehaviour
     public enum ShakePriority { Low, Medium, High, Critical }
 
     private float currentDutch;
-    private Transform currentTarget;
-    private float targetLockTimer;
-    private float targetLockDuration = 0.5f;
-
-    private bool isAutoAiming = false;
-    private bool cacheIsAutoAiming = true;
-    
-    private List<Transform> enemyCache = new List<Transform>();
-    private float cacheTimer;
-    private float cacheRefreshRate = 0.25f;
-
     private float currentFOV;
     private float targetFOV;
 
     private Coroutine shakeCoroutine;
     private ShakeInstance currentShake;
 
-    private class ShakeInstance
-    {
+    class ShakeInstance{
         public float targetAmplitude;
         public float duration;
         public ShakePriority priority;
@@ -117,24 +98,27 @@ public class CameraController : MonoBehaviour
             shakeSettings = Resources.Load<NoiseSettings>("4. Data/Shake_Setting");
             if(shakeSettings == null) Debug.LogError("Couldn't load Shake_Setting!");
         }
+
+        if(autoAim == null) autoAim = GetComponent<CameraAutoAim>();
+        if(autoAim != null) autoAim.OnAutoAimStateChanged += OnAutoAimStateChanged;
     }
 
-    public bool aiming => input.AimHeld;
+    void OnDestroy(){
+        if(autoAim != null) autoAim.OnAutoAimStateChanged -= OnAutoAimStateChanged;
+    }
+
+    public bool aiming => (input.AimHeld && !movement.IsOverheated() && !movement.IsRiding());
 
     void Update(){
         if(!normalCamera || !aimCamera || !input) return;
 
-        if(isAutoAiming != cacheIsAutoAiming){
-            CrosshairUI.Instance.ChangeColor(!isAutoAiming);
-            cacheIsAutoAiming = isAutoAiming;
-        }
-
         UpdateCameraPriority(aiming);
         UpdateDutch(aiming);
         UpdateSpeedZoom();
-        
-        if(enableAutoAim && aiming) UpdateAutoAim();
-        else ResetAutoAim();
+    }
+
+    void OnAutoAimStateChanged(bool isAutoAiming){
+        CrosshairUI.Instance?.ChangeColor(!isAutoAiming);
     }
 
     #region POLISH
@@ -172,9 +156,7 @@ public class CameraController : MonoBehaviour
     public void ShakeCamera(float targetAmplitude, float duration, ShakePriority priority = ShakePriority.Medium){
         if(currentShake != null && priority < currentShake.priority) return;
         
-        if(shakeCoroutine != null){
-            StopCoroutine(shakeCoroutine);
-        }
+        if(shakeCoroutine != null) StopCoroutine(shakeCoroutine);
         
         currentShake = new ShakeInstance(targetAmplitude, duration, priority);
         shakeCoroutine = StartCoroutine(ShakeCoroutine(currentShake));
@@ -234,9 +216,7 @@ public class CameraController : MonoBehaviour
     }
 
     CinemachineBasicMultiChannelPerlin GetActiveNoise(){
-        if(aiming){
-            return aimCameraNoise;
-        }
+        if(aiming) return aimCameraNoise;
         return normalCameraNoise;
     }
 
@@ -256,180 +236,24 @@ public class CameraController : MonoBehaviour
     }
     #endregion
 
-    #region AUTO AIM LOGIC
-    void UpdateAutoAim(){
-        cacheTimer += Time.deltaTime;
-        if(cacheTimer >= cacheRefreshRate){
-            RefreshEnemyCache();
-            cacheTimer = 0f;
-        }
-
-        Transform closestEnemy = FindClosestEnemy();
-        
-        if(closestEnemy != null && IsTargetVisible(closestEnemy)){
-            currentTarget = closestEnemy;
-            targetLockTimer = targetLockDuration;
-            isAutoAiming = true;
-
-            if(playerRotation != null){
-                Vector3 enemyCenter = GetEnemyCenter(closestEnemy);
-                Vector3 cameraPos = GetCameraPosition();
-                
-                Vector3 directionToEnemy = (enemyCenter - cameraPos).normalized;
-                
-                if(directionToEnemy.sqrMagnitude > 0.01f){
-                    Quaternion targetRotation = Quaternion.LookRotation(directionToEnemy);
-                    playerRotation.SetAutoAimTarget(targetRotation);
-                }
-            }
-        }
-        else{
-            targetLockTimer -= Time.deltaTime;
-            if(targetLockTimer <= 0f){
-                currentTarget = null;
-                isAutoAiming = false;
-                
-                if(playerRotation != null){
-                    playerRotation.SetInputDisabled(false);
-                    playerRotation.ClearAutoAim();
-                }
-            }
-        }
+    #region AUTO AIM DELEGATION
+    public void SetAutoAimEnabled(bool enabled){
+        if(autoAim != null) autoAim.SetAutoAimEnabled(enabled);
     }
 
-    bool IsTargetVisible(Transform target){
-        Vector3 enemyCenter = GetEnemyCenter(target);
-        Vector3 cameraPos = GetCameraPosition();
-        
-        Vector3 direction = (enemyCenter - cameraPos).normalized;
-        float distance = Vector3.Distance(cameraPos, enemyCenter);
-        
-        RaycastHit hit;
-        if(Physics.SphereCast(cameraPos, obstructionCheckRadius, direction, out hit, distance)){
-            if(hit.collider != null){
-                Transform hitTransform = hit.collider.transform;
-                
-                if(hitTransform == target || hitTransform.IsChildOf(target)) return true;
-                if(hit.collider.gameObject.layer == enemyLayer) return true;
-                if(hit.collider.GetComponent<IDamageable>() != null) return true;
-                return false;
-            }
-        }
-        
-        return true;
-    }
-
-    void RefreshEnemyCache(){
-        enemyCache.Clear();
-        
-        Collider[] colliders = Physics.OverlapSphere(
-            transform.position,
-            autoAimRange,
-            enemyLayer
-        );
-        
-        foreach(Collider col in colliders){
-            Transform t = col.transform;
-            Vector3 directionToEnemy = (t.position - transform.position).normalized;
-            float angle = Vector3.Angle(transform.forward, directionToEnemy);
-            
-            if(angle <= maxAimAngle){
-                enemyCache.Add(t);
-            }
-        }
-        
-        enemyCache.Sort((a, b) => 
-            Vector3.Distance(transform.position, a.position)
-            .CompareTo(Vector3.Distance(transform.position, b.position))
-        );
-    }
-
-    Transform FindClosestEnemy(){
-        if(enemyCache.Count == 0) return null;
-        
-        foreach(Transform enemy in enemyCache){
-            if(enemy != null && enemy.gameObject.activeInHierarchy){
-                float distance = Vector3.Distance(transform.position, enemy.position);
-                if(distance <= autoAimRange && distance >= minAimDistance)
-                    return enemy;
-            }
-        }
+    public Transform GetCurrentTarget(){
+        if(autoAim != null) return autoAim.GetCurrentTarget();
         return null;
     }
 
-    Vector3 GetEnemyCenter(Transform enemy){
-        Renderer renderer = enemy.GetComponentInChildren<Renderer>();
-        if(renderer != null) return renderer.bounds.center;
-        
-        Collider collider = enemy.GetComponentInChildren<Collider>();
-        if(collider != null) return collider.bounds.center;
-        
-        return enemy.position + Vector3.up * 1f;
+    public bool HasTarget(){
+        if(autoAim != null) return autoAim.HasTarget();
+        return false;
     }
 
-    Vector3 GetCameraPosition(){
-        if(cameraTransform != null) return cameraTransform.position;
-        if(playerRotation != null) return playerRotation.transform.position + Vector3.up * cameraHeightOffset;
-        return transform.position + Vector3.up * cameraHeightOffset;
-    }
-
-    void ResetAutoAim(){
-        if(isAutoAiming){
-            isAutoAiming = false;
-            
-            if(playerRotation != null){
-                playerRotation.SetInputDisabled(false);
-                playerRotation.ClearAutoAim();
-            }
-        }
-        currentTarget = null;
-    }
-
-    public void SetAutoAimEnabled(bool enabled){
-        enableAutoAim = enabled;
-        if(!enabled){
-            ResetAutoAim();
-        }
-    }
-    #endregion
-
-    public Transform GetCurrentTarget() => currentTarget;
-    public bool HasTarget() => currentTarget != null && targetLockTimer > 0f;
-    public bool IsAutoAiming() => isAutoAiming;
-
-    #region DEBUG LOGIC
-    void OnDrawGizmosSelected(){
-        if(!enableAutoAim) return;
-        
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, autoAimRange);
-        
-        if(currentTarget != null){
-            Vector3 enemyCenter = GetEnemyCenter(currentTarget);
-            Vector3 cameraPos = GetCameraPosition();
-            
-            Gizmos.color = Color.green;
-            Gizmos.DrawLine(cameraPos, enemyCenter);
-            Gizmos.DrawWireSphere(enemyCenter, 0.5f);
-            
-            Gizmos.color = Color.blue;
-            Gizmos.DrawWireSphere(cameraPos, 0.3f);
-            
-            Gizmos.color = Color.cyan;
-            Vector3 direction = (enemyCenter - cameraPos).normalized;
-            Gizmos.DrawWireSphere(cameraPos + direction * Vector3.Distance(cameraPos, enemyCenter) * 0.5f, obstructionCheckRadius);
-        }
-        
-        Vector3 forward = transform.forward;
-        Quaternion leftRotation = Quaternion.AngleAxis(-maxAimAngle, Vector3.up);
-        Quaternion rightRotation = Quaternion.AngleAxis(maxAimAngle, Vector3.up);
-        
-        Vector3 leftDir = leftRotation * forward;
-        Vector3 rightDir = rightRotation * forward;
-        
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawRay(transform.position, leftDir * autoAimRange);
-        Gizmos.DrawRay(transform.position, rightDir * autoAimRange);
+    public bool IsAutoAiming(){
+        if(autoAim != null) return autoAim.IsAutoAiming();
+        return false;
     }
     #endregion
 }

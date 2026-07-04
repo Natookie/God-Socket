@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3191055770562936840
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3869816658274424368}
+  m_Layer: 9
+  m_Name: Ride Pos
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3869816658274424368
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3191055770562936840}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2036543228427068663}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5075748024934720823
 GameObject:
   m_ObjectHideFlags: 0
@@ -14,7 +45,7 @@ GameObject:
   - component: {fileID: 68334427173037875}
   - component: {fileID: -4780794278076855384}
   - component: {fileID: 9196572090970902051}
-  m_Layer: 6
+  m_Layer: 9
   m_Name: 'Missile Launcher [Test]'
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -33,7 +64,8 @@ Transform:
   m_LocalPosition: {x: -26.95708, y: 58.39947, z: 96.8609}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 3869816658274424368}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &8593915161845255628
@@ -152,11 +184,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3872693737a8be49893e8800fa93d7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissileLauncher
-  speed: 10
+  speed: 8
   rotationSpeed: 200
-  damage: 15
+  damage: 75
   explosionRadius: 5
   maxLifeTime: 100
   target: {fileID: 0}
   visualModel: {fileID: 1981131855061102, guid: 7ec354ef3daae7641b7a3fa5e1fe0c81, type: 3}
   explosionEffect: {fileID: 0}
+  isBeingRidden: 0
+  ridePosition: {fileID: 3869816658274424368}
+  rideDetectionRadius: 3
+  mouseSensitivity: 2
+  yawSpeed: 4
+  pitchSpeed: 3
+  minPitch: -80
+  maxPitch: 80
+  dismountLaunchForce: 100
+  dismountLaunchUpForce: 5
+  mountCooldown: 3
