@@ -89,6 +89,7 @@ public class WeaponController : MonoBehaviour
         }
 
         nextFireTime = Time.time + fireRate;
+        AudioManager.Instance.PlaySFX(GameSFX.PlayerGun);
     }
 
     void PlayMuzzleFlash(){

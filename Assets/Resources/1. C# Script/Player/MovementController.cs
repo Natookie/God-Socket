@@ -105,9 +105,14 @@ public class MovementController : MonoBehaviour
     void FixedUpdate(){
         WorldMoveDirection = Vector3.zero;
 
-        if(isOverheated || inputDisabled) return;
+        if(isOverheated || inputDisabled) 
+        {
+        UpdateFlyingWindSound();
+        return;
+        }
 
         HandleMovement();
+        UpdateFlyingWindSound();
 
         bool isAiming = input != null && input.AimHeld;
 
@@ -171,5 +176,21 @@ public class MovementController : MonoBehaviour
         }
 
         if(rb.linearVelocity.magnitude > currentMaxSpeed) rb.linearVelocity = rb.linearVelocity.normalized * currentMaxSpeed;
+    }
+
+    void UpdateFlyingWindSound()
+    {
+        if (AudioManager.Instance == null) return;
+
+        bool isAiming = CameraController.Instance != null && CameraController.Instance.aiming;
+
+        bool shouldPlayWind =
+            boostActive &&
+            !isOverheated &&
+            !inputDisabled &&
+            !isAiming &&
+            rb.linearVelocity.magnitude > 0.5f;
+
+        AudioManager.Instance.SetFlyingWind(shouldPlayWind);
     }
 }
