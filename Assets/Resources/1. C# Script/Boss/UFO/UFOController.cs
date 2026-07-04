@@ -166,6 +166,11 @@ public class UFOController : MonoBehaviour, IDamageable
     void FireProjectile(){
         if(projectilePrefab == null || firePoint == null || player == null) return;
         
+        if(AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(GameSFX.UfoGun);
+        }
+
         Vector3 fireDirection = (player.position - firePoint.position).normalized;
         
         fireDirection = Quaternion.Euler(
@@ -239,6 +244,11 @@ public class UFOController : MonoBehaviour, IDamageable
         isDead = true;
         isActive = false;
         
+        if(AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(GameSFX.UfoDestroyed);
+        }
+
         if(deathParticles != null){
             deathParticles.transform.parent = null;
             deathParticles.Play();
