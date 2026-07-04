@@ -12,7 +12,7 @@ public class PlayerRotation : MonoBehaviour
     [Header("SENSITIVITY")]
     public float defaultSensitivity = 2f;
     private float mouseSensitivity;
-    private float sensitivityMultiplier;
+    private float sensitivityMultiplier = 1f;
 
     [Header("LIMITS")]
     public float minPitch = -80f;
@@ -53,8 +53,9 @@ public class PlayerRotation : MonoBehaviour
     }
 
     public void LoadSensitivity(){
-        mouseSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", defaultSensitivity);
-        sensitivityMultiplier = mouseSensitivity / defaultSensitivity;
+        sensitivityMultiplier = GameSettings.Sensitivity;
+        // mouseSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", defaultSensitivity);
+        // sensitivityMultiplier = mouseSensitivity / defaultSensitivity;
         // Debug.Log("Loaded Mouse Sensitivity: " + mouseSensitivity);
         // Debug.Log("Sensitivity Multiplier: " + sensitivityMultiplier);
     }

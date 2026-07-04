@@ -7,7 +7,8 @@ public enum GameSFX
     PlayerGun,
     UfoGun,
     BuildingDestroyed,
-    UfoDestroyed
+    UfoDestroyed,
+    ButtonClick
 }
 
 public class AudioManager : MonoBehaviour
@@ -28,6 +29,7 @@ public class AudioManager : MonoBehaviour
     public AudioClip projectileGunUfo;
     public AudioClip buildingDestroyed;
     public AudioClip ufoDestroyed;
+    public AudioClip buttonClick;
 
     [Header("Loop SFX")]
     public AudioSource flyingWindSource;
@@ -46,8 +48,10 @@ public class AudioManager : MonoBehaviour
 
     private const string MASTER_VOLUME_KEY = "MasterVolume";
 
-    private void Awake(){
-        if(Instance != null && Instance != this){
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
             Destroy(gameObject);
             return;
         }
@@ -65,23 +69,29 @@ public class AudioManager : MonoBehaviour
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    private void Start(){
+    private void Start()
+    {
         PlayBGMByCurrentScene();
     }
 
-    private void OnDestroy(){
-        if(Instance == this){
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
             SceneManager.sceneLoaded -= OnSceneLoaded;
         }
     }
 
-    private void OnSceneLoaded(Scene scene, LoadSceneMode mode){
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
         PlayBGMBySceneName(scene.name);
         StopFlyingWind();
     }
 
-    private void SetupBGMSource(){
-        if(bgmSource == null){
+    private void SetupBGMSource()
+    {
+        if (bgmSource == null)
+        {
             bgmSource = gameObject.AddComponent<AudioSource>();
         }
 
@@ -90,8 +100,10 @@ public class AudioManager : MonoBehaviour
         bgmSource.volume = bgmVolume;
     }
 
-    private void SetupFlyingWindSource(){
-        if(flyingWindSource == null){
+    private void SetupFlyingWindSource()
+    {
+        if (flyingWindSource == null)
+        {
             flyingWindSource = gameObject.AddComponent<AudioSource>();
         }
 
@@ -100,8 +112,10 @@ public class AudioManager : MonoBehaviour
         flyingWindSource.volume = flyingWindVolume;
     }
 
-    private void SetupSFXSources(){
-        for (int i = 0; i < sfxSourceCount; i++){
+    private void SetupSFXSources()
+    {
+        for (int i = 0; i < sfxSourceCount; i++)
+        {
             AudioSource source = gameObject.AddComponent<AudioSource>();
             source.loop = false;
             source.playOnAwake = false;
@@ -111,27 +125,34 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    private void PlayBGMByCurrentScene(){
+    private void PlayBGMByCurrentScene()
+    {
         Scene currentScene = SceneManager.GetActiveScene();
         PlayBGMBySceneName(currentScene.name);
     }
 
-    private void PlayBGMBySceneName(string sceneName){
-        if(sceneName == mainMenuSceneName){
+    private void PlayBGMBySceneName(string sceneName)
+    {
+        if (sceneName == mainMenuSceneName)
+        {
             PlayBGM(mainBGM);
         }
-        else if(sceneName == gameSceneName){
+        else if (sceneName == gameSceneName)
+        {
             PlayBGM(gameBGM);
         }
     }
 
-    public void PlayBGM(AudioClip clip){
-        if(clip == null){
+    public void PlayBGM(AudioClip clip)
+    {
+        if (clip == null)
+        {
             Debug.LogWarning("No BGM clip assigned.");
             return;
         }
 
-        if(bgmSource.clip == clip && bgmSource.isPlaying){
+        if (bgmSource.clip == clip && bgmSource.isPlaying)
+        {
             return;
         }
 
@@ -141,16 +162,20 @@ public class AudioManager : MonoBehaviour
         Debug.Log("Playing BGM: " + clip.name);
     }
 
-    public void StopBGM(){
-        if(bgmSource != null){
+    public void StopBGM()
+    {
+        if (bgmSource != null)
+        {
             bgmSource.Stop();
         }
     }
 
-    public void PlaySFX(GameSFX sfx){
+    public void PlaySFX(GameSFX sfx)
+    {
         AudioClip clip = GetSFXClip(sfx);
 
-        if(clip == null){
+        if (clip == null)
+        {
             Debug.LogWarning("Missing SFX clip: " + sfx);
             return;
         }
@@ -160,19 +185,38 @@ public class AudioManager : MonoBehaviour
         source.PlayOneShot(clip);
     }
 
-    private AudioClip GetSFXClip(GameSFX sfx){
-        switch (sfx){
-            case GameSFX.PlayerGun: return projectileGunPlayer;
-            case GameSFX.UfoGun: return projectileGunUfo;
-            case GameSFX.BuildingDestroyed: return buildingDestroyed;
-            case GameSFX.UfoDestroyed: return ufoDestroyed;
-            default: return null;
+    private AudioClip GetSFXClip(GameSFX sfx)
+    {
+        switch (sfx)
+        {
+            case GameSFX.PlayerGun:
+                return projectileGunPlayer;
+
+            case GameSFX.UfoGun:
+                return projectileGunUfo;
+
+            case GameSFX.BuildingDestroyed:
+                return buildingDestroyed;
+
+            case GameSFX.UfoDestroyed:
+                return ufoDestroyed;
+
+            case GameSFX.ButtonClick:
+                return buttonClick;
+
+            default:
+                return null;
         }
     }
 
-    private AudioSource GetAvailableSFXSource(){
-        foreach (AudioSource source in sfxSources){
-            if(!source.isPlaying) return source;
+    private AudioSource GetAvailableSFXSource()
+    {
+        foreach (AudioSource source in sfxSources)
+        {
+            if (!source.isPlaying)
+            {
+                return source;
+            }
         }
 
         AudioSource newSource = gameObject.AddComponent<AudioSource>();
@@ -184,30 +228,51 @@ public class AudioManager : MonoBehaviour
         return newSource;
     }
 
-    public void SetFlyingWind(bool isFlying){
-        if(robotFlyingWind == null) return;
-        if(isFlying) PlayFlyingWind();
-        else StopFlyingWind();
+    public void SetFlyingWind(bool isFlying)
+    {
+        if (robotFlyingWind == null)
+        {
+            return;
+        }
+
+        if (isFlying)
+        {
+            PlayFlyingWind();
+        }
+        else
+        {
+            StopFlyingWind();
+        }
     }
 
-    public void PlayFlyingWind(){
-        if(robotFlyingWind == null){
+    public void PlayFlyingWind()
+    {
+        if (robotFlyingWind == null)
+        {
             Debug.LogWarning("Robot flying wind clip is missing.");
             return;
         }
 
-        if(flyingWindSource.isPlaying) return;
+        if (flyingWindSource.isPlaying)
+        {
+            return;
+        }
 
         flyingWindSource.clip = robotFlyingWind;
         flyingWindSource.volume = flyingWindVolume;
         flyingWindSource.Play();
     }
 
-    public void StopFlyingWind(){
-        if(flyingWindSource != null && flyingWindSource.isPlaying) flyingWindSource.Stop();
+    public void StopFlyingWind()
+    {
+        if (flyingWindSource != null && flyingWindSource.isPlaying)
+        {
+            flyingWindSource.Stop();
+        }
     }
 
-    public void SetMasterVolume(float volume){
+    public void SetMasterVolume(float volume)
+    {
         volume = Mathf.Clamp01(volume);
 
         AudioListener.volume = volume;
@@ -218,6 +283,19 @@ public class AudioManager : MonoBehaviour
         Debug.Log("Master Volume changed to: " + volume);
     }
 
-    public void SetBGMVolume(float volume) => SetMasterVolume(volume);
-    public float GetMasterVolume() => PlayerPrefs.GetFloat(MASTER_VOLUME_KEY, defaultVolume);
+    // Keep this so your old Settings UI still works
+    public void SetBGMVolume(float volume)
+    {
+        SetMasterVolume(volume);
+    }
+
+    public float GetMasterVolume()
+    {
+        return PlayerPrefs.GetFloat(MASTER_VOLUME_KEY, defaultVolume);
+    }
+
+    public void PlayButtonClick()
+    {
+        PlaySFX(GameSFX.ButtonClick);
+    }
 }
