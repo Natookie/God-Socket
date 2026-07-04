@@ -17,6 +17,7 @@ public class BossController : MonoBehaviour
     public int ufoPoolSize = 10;
     public int ufoSpawnCount = 3;
     public float ufoSpawnDelay = 0.5f;
+    public Transform[] ufoSpawnPoints;
     
     [Header("MISSILE")]
     public GameObject missilePrefab;
@@ -24,6 +25,7 @@ public class BossController : MonoBehaviour
     public int missilePoolSize = 5;
     public int missileCount = 3;
     public float missileSpawnDelay = 1f;
+    public Transform missileSpawnPoint;
     
     [Header("GRAVITY FIELD")]
     public GravityFieldController gravityFieldController;
@@ -91,9 +93,7 @@ public class BossController : MonoBehaviour
     
     void OnDestroy(){
         if(healthSystem != null) healthSystem.OnDeath -= Die;
-        if(weakpointManager != null){
-            weakpointManager.OnAllWeakPointsDestroyed -= OnAllWeakPointsDestroyed;
-        }
+        if(weakpointManager != null) weakpointManager.OnAllWeakPointsDestroyed -= OnAllWeakPointsDestroyed;
     }
     
     void CreatePools(){
@@ -252,7 +252,14 @@ public class BossController : MonoBehaviour
             
             GameObject ufo = GetPooled(ufoPool);
             if(ufo != null){
-                ufo.transform.position = transform.position + Random.insideUnitSphere * 5f;
+                Transform spawnPoint = GetRandomUFOSpawnPoint();
+                if(spawnPoint != null){
+                    ufo.transform.position = spawnPoint.position;
+                    ufo.transform.rotation = spawnPoint.rotation;
+                }
+                else{
+                    ufo.transform.position = transform.position + Random.insideUnitSphere * 5f;
+                }
                 ufo.SetActive(true);
                 activeUFOs.Add(ufo);
                 
@@ -274,7 +281,14 @@ public class BossController : MonoBehaviour
             
             GameObject missileObj = GetPooled(missilePool);
             if(missileObj != null){
-                missileObj.transform.position = transform.position + Vector3.up * 3f + Random.insideUnitSphere * 2f;
+                if(missileSpawnPoint != null){
+                    missileObj.transform.position = missileSpawnPoint.position;
+                    missileObj.transform.rotation = missileSpawnPoint.rotation;
+                }
+                else{
+                    missileObj.transform.position = transform.position + Vector3.up * 3f + Random.insideUnitSphere * 2f;
+                }
+                missileObj.layer = LayerMask.NameToLayer("EnemyProjectile");
                 missileObj.SetActive(true);
                 
                 MissileController missile = missileObj.GetComponent<MissileController>();
@@ -321,6 +335,18 @@ public class BossController : MonoBehaviour
             ExitState();
             EnterState(BossState.Idle);
         }
+    }
+
+    Transform GetRandomUFOSpawnPoint(){
+        if(ufoSpawnPoints == null || ufoSpawnPoints.Length == 0) return null;
+        
+        List<Transform> availablePoints = new List<Transform>();
+        foreach(Transform point in ufoSpawnPoints){
+            if(point != null) availablePoints.Add(point);
+        }
+        
+        if(availablePoints.Count == 0) return null;
+        return availablePoints[Random.Range(0, availablePoints.Count)];
     }
 
     bool HasAvailableBuildings(){
