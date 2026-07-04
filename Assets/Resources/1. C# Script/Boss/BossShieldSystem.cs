@@ -77,7 +77,6 @@ public class BossShieldSystem : MonoBehaviour, IDamageable
 
     void SetFade(float fade){
         currentFade = Mathf.Clamp(fade, minFade, maxFade);
-        Debug.Log($"Setting shield fade to {currentFade}");
         mpb.SetFloat(OpacityID, currentFade);
         shieldRenderer.SetPropertyBlock(mpb);
     }

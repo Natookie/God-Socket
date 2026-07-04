@@ -315,11 +315,13 @@ public class MissileController : MonoBehaviour
 
     void OnCollisionEnter(Collision collision){
         if(isExploded || !isActive) return;
+        if(collision.gameObject.CompareTag("Player")) return;
         IDamageable damageable = collision.gameObject.GetComponent<IDamageable>();
         if(damageable != null) Explode();
     }
     void OnTriggerEnter(Collider other){
         if(isExploded || !isActive) return;
+        if(other.CompareTag("Player")) return;
         IDamageable damageable = other.GetComponent<IDamageable>();
         if(damageable != null) Explode();
     }
