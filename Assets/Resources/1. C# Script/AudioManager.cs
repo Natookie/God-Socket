@@ -7,7 +7,8 @@ public enum GameSFX
     PlayerGun,
     UfoGun,
     BuildingDestroyed,
-    UfoDestroyed
+    UfoDestroyed,
+    ButtonClick
 }
 
 public class AudioManager : MonoBehaviour
@@ -28,6 +29,7 @@ public class AudioManager : MonoBehaviour
     public AudioClip projectileGunUfo;
     public AudioClip buildingDestroyed;
     public AudioClip ufoDestroyed;
+    public AudioClip buttonClick;
 
     [Header("Loop SFX")]
     public AudioSource flyingWindSource;
@@ -199,6 +201,9 @@ public class AudioManager : MonoBehaviour
             case GameSFX.UfoDestroyed:
                 return ufoDestroyed;
 
+            case GameSFX.ButtonClick:
+                return buttonClick;
+
             default:
                 return null;
         }
@@ -287,5 +292,10 @@ public class AudioManager : MonoBehaviour
     public float GetMasterVolume()
     {
         return PlayerPrefs.GetFloat(MASTER_VOLUME_KEY, defaultVolume);
+    }
+
+    public void PlayButtonClick()
+    {
+        PlaySFX(GameSFX.ButtonClick);
     }
 }
