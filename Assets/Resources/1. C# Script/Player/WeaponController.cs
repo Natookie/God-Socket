@@ -67,6 +67,7 @@ public class WeaponController : MonoBehaviour
         }
 
         nextFireTime = Time.time + fireRate;
+        AudioManager.Instance.PlaySFX(GameSFX.PlayerGun);
     }
 
     Vector3 GetAimDirection(){
