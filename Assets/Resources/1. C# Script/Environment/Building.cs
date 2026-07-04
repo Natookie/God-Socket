@@ -82,11 +82,6 @@ public class Building : MonoBehaviour, IDamageable
         destroyed = true;
         if(!hasChild) return;
 
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.PlaySFX(GameSFX.BuildingDestroyed);
-        }
-
         Vector3 explosionOrigin = transform.position + Vector3.up * 2f;
         for(int i = 0; i < transform.childCount; i++){
             Transform piece = transform.GetChild(i);
