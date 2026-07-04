@@ -13,6 +13,12 @@ public class BuildingManager : MonoBehaviour
     [Header("AUTO POPULATE")]
     public bool autoPopulateOnStart = true;
 
+    [Header("EXPLOSION EFFECT")]
+    public ParticleSystem explosionParticlePrefab;
+
+    [Header("GUI")]
+    public bool showGUI = false;
+
     void Awake(){
         if(Instance != null){
             Destroy(gameObject);
@@ -25,16 +31,57 @@ public class BuildingManager : MonoBehaviour
         if(autoPopulateOnStart) PopulateList();
     }
 
+    void OnGUI(){
+        if(!showGUI) return;
+
+        if(buildingStates == null || buildingStates.Count == 0){
+            GUI.Box(new Rect(10, 10, 300, 50), "Building States");
+            GUI.Label(new Rect(20, 40, 250, 20), "No buildings in dictionary");
+            return;
+        }
+
+        int height = 30 + (buildingStates.Count * 25);
+        GUI.Box(new Rect(10, 10, 350, height), "Building States");
+        
+        int yOffset = 40;
+        foreach(var kvp in buildingStates){
+            string stateText = kvp.Value.ToString();
+            Color originalColor = GUI.color;
+            
+            switch(kvp.Value){
+                case BuildingState.Available:
+                    GUI.color = Color.green;
+                    break;
+                case BuildingState.Targeted:
+                    GUI.color = Color.yellow;
+                    break;
+                case BuildingState.Destroyed:
+                    GUI.color = Color.red;
+                    break;
+            }
+            
+            string displayName = kvp.Key != null ? kvp.Key.name : "NULL";
+            GUI.Label(new Rect(20, yOffset, 300, 20), $"{displayName}: {stateText}");
+            
+            GUI.color = originalColor;
+            yOffset += 25;
+        }
+    }
+
     [Button("Populate Building List", enabledMode: EButtonEnableMode.Editor)]
     void PopulateList(){
         buildings.Clear();
         buildingStates.Clear();
         
         Building[] found = FindObjectsByType<Building>(FindObjectsSortMode.None);
+        
         foreach(Building b in found){
             if(b != null){
                 buildings.Add(b);
                 buildingStates[b] = BuildingState.Available;
+                b.SetupBuilding(null);
+                
+                if(explosionParticlePrefab != null) b.explosionParticlePrefab = explosionParticlePrefab;
             }
         }
     }
@@ -43,6 +90,9 @@ public class BuildingManager : MonoBehaviour
         if(b == null || buildingStates.ContainsKey(b)) return;
         buildings.Add(b);
         buildingStates[b] = BuildingState.Available;
+        b.SetupBuilding(null);
+        
+        if(explosionParticlePrefab != null) b.explosionParticlePrefab = explosionParticlePrefab;
     }
 
     public void RemoveBuilding(Building b){
@@ -82,6 +132,10 @@ public class BuildingManager : MonoBehaviour
     public BuildingState GetState(Building b){
         if(b == null || !buildingStates.ContainsKey(b)) return BuildingState.Destroyed;
         return buildingStates[b];
+    }
+
+    public Dictionary<Building, BuildingState> GetBuildingStates(){
+        return buildingStates;
     }
 
     public void Clear(){
