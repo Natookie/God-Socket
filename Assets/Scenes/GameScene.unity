@@ -797,8 +797,6 @@ MonoBehaviour:
   droneEnergyText: {fileID: 735710597}
   drone: {fileID: 1837087367}
   player: {fileID: 500886790}
-  shutdownVignette: {fileID: 1012090605}
-  globalVolume: {fileID: 832575518}
 --- !u!1 &77292418
 GameObject:
   m_ObjectHideFlags: 0
@@ -1999,7 +1997,6 @@ GameObject:
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
   - component: {fileID: 330585548}
-  - component: {fileID: 330585550}
   - component: {fileID: 330585549}
   m_Layer: 0
   m_Name: Main Camera
@@ -2146,12 +2143,19 @@ MonoBehaviour:
   input: {fileID: 1015661011}
   playerRotation: {fileID: 500886796}
   movement: {fileID: 500886789}
-  autoAim: {fileID: 330585550}
   activePriority: 20
   inactivePriority: 10
   maxDutch: 5
   yawRateForMaxDutch: 150
   dutchSmoothSpeed: 1
+  enableAutoAim: 1
+  autoAimRange: 15
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 256
+  maxAimAngle: 15
+  minAimDistance: 2
+  obstructionCheckRadius: 0.5
   cameraTransform: {fileID: 330585546}
   cameraHeightOffset: 3
   shakeSettings: {fileID: 0}
@@ -2855,7 +2859,6 @@ Transform:
   - {fileID: 1304748571}
   - {fileID: 1789910128}
   - {fileID: 993021840}
-  - {fileID: 4434907987957617}
   m_Father: {fileID: 727994341}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &500886787
@@ -2895,8 +2898,6 @@ MonoBehaviour:
   maxRange: 100
   poolParent: {fileID: 526502397}
   poolSize: 200
-  muzzleFlashParticle: {fileID: 198234346748616026, guid: ad2ab49d0a2a17148bd51c93d977bdbc, type: 3}
-  particleDuration: 0.5
   input: {fileID: 1015661011}
   energy: {fileID: 500886790}
   playerCamera: {fileID: 330585545}
@@ -2940,11 +2941,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnergySystem
   maxEnergy: 100
   boostDrainPerSecond: 15
-  shotCost: 10
+  shotCost: 1
   overheatCooldown: 8
   currentEnergy: 0
   infiniteEnergy: 1
-  energyUI: {fileID: 70218958}
 --- !u!54 &500886792
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -3997,7 +3997,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 1
+  m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -5848,6 +5848,7 @@ Transform:
   - {fileID: 881189697}
   - {fileID: 832575519}
   - {fileID: 1745260874}
+  - {fileID: 2124595094}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &955850195
@@ -6141,30 +6142,52 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1012090604}
-  - component: {fileID: 1012090606}
-  - component: {fileID: 1012090605}
-  m_Layer: 5
-  m_Name: Shut Down Vignete
+  - component: {fileID: 1015661012}
+  - component: {fileID: 1015661011}
+  m_Layer: 0
+  m_Name: Input Handler
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1012090604
+--- !u!114 &1015661011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015661010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df9aaa36e9af15b4e98afbacf80bfbdc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InputHandler
+  forward: 119
+  backward: 115
+  left: 97
+  right: 100
+  up: 101
+  down: 113
+  boost: 304
+  resupplyToggleKey: 9
+  aimMouseButton: 1
+  fireMouseButton: 0
+  cursorToggleKey: 308
+--- !u!4 &1015661012
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1012090603}
+  m_GameObject: {fileID: 1015661010}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1523662881}
+  m_Father: {fileID: 831831217}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1012090605
 MonoBehaviour:
@@ -6590,10 +6613,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d48d9071bf73e014185440672a61ec33, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossController
+  stateDuration: 0
+  stateVariance: 1.5
   idleDuration: 3
-  ufoDuration: 5
-  missileDuration: 8
-  gravityDuration: 15
   ufoPrefab: {fileID: 2435844892469826274, guid: e53a09ec9bb8ec248a0fd43038b3f259, type: 3}
   ufoParent: {fileID: 710938316}
   ufoPoolSize: 10
@@ -6614,21 +6636,15 @@ MonoBehaviour:
   laserFieldController: {fileID: 1043311175}
   weakpointManager: {fileID: 1490474627}
   bossAimer: {fileID: 1032565923}
-  chargeTime: 10
+  chargeTime: 1
   laserDuration: 1
   player: {fileID: 1032565916}
   healthSystem: {fileID: 1032565922}
-  shieldSystem: {fileID: 1929512768}
   deathEffect: {fileID: 0}
   audioSource: {fileID: 0}
   deathSound: {fileID: 0}
-  shieldCollider: {fileID: 1929512765}
-  shieldDamageMultiplier: 0.5
   disableLogic: 1
   enableDebugInput: 1
-  isGravityActive: 0
-  isLaserActive: 0
-  isShieldActive: 0
 --- !u!65 &1032565918
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -9234,7 +9250,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 1
+  m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -9291,7 +9307,6 @@ Transform:
   m_Children:
   - {fileID: 410087041}
   - {fileID: 937479128}
-  - {fileID: 592898283}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1365976551
@@ -11906,7 +11921,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 1
+  m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -12315,8 +12330,6 @@ MonoBehaviour:
   - {fileID: 739539247}
   - {fileID: 861814818}
   autoPopulateOnStart: 1
-  explosionParticlePrefab: {fileID: 767083504952656910, guid: adbb57986991af5459379e9eb7a6a30a, type: 3}
-  showGUI: 1
 --- !u!1 &1837087365
 GameObject:
   m_ObjectHideFlags: 0
@@ -12908,67 +12921,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9117b6d975111c47b064a4373cc67ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nova::Nova.UIBlockActivator
---- !u!1001 &1893634619
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1000011128802252, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_Name
-      value: PlasmaExplosionEffect
-      objectReference: {fileID: 0}
-    - target: {fileID: 1000011128802252, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 2.2746453
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 7.27
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -6.17
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: -90
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4000011693693590, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 96730f8640590934eacb6f860058e7f9, type: 3}
 --- !u!1 &1898864199
 GameObject:
   m_ObjectHideFlags: 0
@@ -13126,19 +13078,19 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1929512764}
-  - component: {fileID: 1929512767}
-  - component: {fileID: 1929512766}
-  - component: {fileID: 1929512765}
-  - component: {fileID: 1929512768}
+  - component: {fileID: 2061840594}
+  - component: {fileID: 2061840598}
+  - component: {fileID: 2061840597}
+  - component: {fileID: 2061840596}
+  - component: {fileID: 2061840595}
   m_Layer: 8
-  m_Name: Plasma Shield
+  m_Name: WP1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1929512764
+--- !u!4 &2061840594
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -29412,4 +29364,3 @@ SceneRoots:
   - {fileID: 1192461193}
   - {fileID: 1343031001}
   - {fileID: 768968598}
-  - {fileID: 1893634619}
