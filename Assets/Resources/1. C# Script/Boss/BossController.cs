@@ -6,9 +6,10 @@ using NaughtyAttributes;
 public class BossController : MonoBehaviour
 {
     [Header("STATE TIMING")]
-    public float stateDuration = 5f;
-    public float stateVariance = 1.5f;
     public float idleDuration = 2f;
+    public float ufoDuration = 5f;
+    public float missileDuration = 8f;
+    public float gravityDuration = 15f;
     
     [Header("UFO")]
     public GameObject ufoPrefab;
@@ -22,6 +23,7 @@ public class BossController : MonoBehaviour
     public Transform missileParent;
     public int missilePoolSize = 5;
     public int missileCount = 3;
+    public float missileSpawnDelay = 1f;
     
     [Header("GRAVITY FIELD")]
     public GravityFieldController gravityFieldController;
@@ -34,9 +36,14 @@ public class BossController : MonoBehaviour
     [Header("REFERENCES")]
     public Transform player;
     public BossHealthSystem healthSystem;
+    public BossShieldSystem shieldSystem;
     public ParticleSystem deathEffect;
     public AudioSource audioSource;
     public AudioClip deathSound;
+
+    [Header("SHIELD")]
+    public Collider shieldCollider;
+    public float shieldDamageMultiplier = 0.5f;
 
     [Header("DEBUG")]
     [SerializeField] private bool disableLogic;
@@ -44,18 +51,18 @@ public class BossController : MonoBehaviour
     
     private enum BossState { Idle, UFO, Missile, Gravity }
     private BossState currentState = BossState.Idle;
-    private float timer;
+    private float stateTimer = 0f;
     private bool isDefeated = false;
     
     private List<GameObject> ufoPool = new List<GameObject>();
     private List<GameObject> missilePool = new List<GameObject>();
     private List<GameObject> activeUFOs = new List<GameObject>();
-    private List<GameObject> activeMissiles = new List<GameObject>();
+    private List<MissileController> activeMissiles = new List<MissileController>();
     
-    private bool isGravityActive = false;
-    private bool isLaserActive = false;
-    private bool isGravityStateInterruptible = false;
-    private Coroutine gravityCoroutine;
+    private Coroutine currentCoroutine = null;
+    [ReadOnly] public bool isGravityActive = false;
+    [ReadOnly] public bool isLaserActive = false;
+    [ReadOnly] public bool isShieldActive = false;
 
     void Start(){
         CreatePools();
@@ -75,6 +82,11 @@ public class BossController : MonoBehaviour
         if(weakpointManager != null){
             weakpointManager.OnAllWeakPointsDestroyed += OnAllWeakPointsDestroyed;
         }
+        
+        if(shieldCollider != null) shieldCollider.enabled  = false;
+        
+        currentState = BossState.Idle;
+        stateTimer = 0f;
     }
     
     void OnDestroy(){
@@ -113,67 +125,128 @@ public class BossController : MonoBehaviour
         if(enableDebugInput) HandleDebugInput();
         if(disableLogic) return;
 
-        timer += Time.deltaTime;
-        if(currentState == BossState.Idle){
-            if(timer >= idleDuration){
-                timer = 0f;
-                PickRandomState();
-            }
-        }
-        else{
-            if(isGravityStateInterruptible && timer >= stateDuration + Random.Range(-stateVariance, stateVariance)){
-                timer = 0f;
-                EndCurrentState();
-                currentState = BossState.Idle;
-            }
-        }
-        
+        stateTimer += Time.deltaTime;
+        CheckStateExit();
         CleanupDeadEntities();
+        UpdateBuildingTargets();
     }
 
     void HandleDebugInput(){
         if(Input.GetKeyDown(KeyCode.Alpha1)){
             DebugUFO();
-            Debug.Log("KD1");
         }
         else if(Input.GetKeyDown(KeyCode.Alpha2)){
             DebugMissile();
-            Debug.Log("KD2");
         }
         else if(Input.GetKeyDown(KeyCode.Alpha3)){
             DebugGravity();
-            Debug.Log("KD3");
         }
     }
-    
-    void PickRandomState(){
+
+    void CheckStateExit(){
+        switch(currentState){
+            case BossState.Idle:
+                if(stateTimer >= idleDuration){
+                    ExitState();
+                    EnterState(GetNextState());
+                }
+                break;
+                
+            case BossState.UFO:
+                if(stateTimer >= ufoDuration || activeUFOs.Count == 0){
+                    ExitState();
+                    EnterState(BossState.Idle);
+                }
+                break;
+                
+            case BossState.Missile:
+                if(stateTimer >= missileDuration || activeMissiles.Count == 0){
+                    ExitState();
+                    EnterState(BossState.Idle);
+                }
+                break;
+                
+            case BossState.Gravity:
+                break;
+        }
+    }
+
+    BossState GetNextState(){
         int choice = Random.Range(0, 3);
         
+        if(choice == 1 && !HasAvailableBuildings()){
+            choice = Random.Range(0, 2);
+            if(choice == 1) choice = 0;
+        }
+        
         switch(choice){
-            case 0: 
-                currentState = BossState.UFO;
-                isGravityStateInterruptible = true;
-                StartCoroutine(SpawnUFOs());
+            case 0: return BossState.UFO;
+            case 1: return BossState.Missile;
+            case 2: return BossState.Gravity;
+            default: return BossState.UFO;
+        }
+    }
+
+    void EnterState(BossState newState){
+        if(isDefeated) return;
+        
+        currentState = newState;
+        stateTimer = 0f;
+        
+        switch(newState){
+            case BossState.Idle:
+                DeactivateShield();
                 break;
-            case 1: 
-                currentState = BossState.Missile;
-                isGravityStateInterruptible = true;
-                StartCoroutine(SpawnMissile());
+                
+            case BossState.UFO:
+                ActivateShield();
+                currentCoroutine = StartCoroutine(UFOCoroutine());
                 break;
-            case 2: 
-                currentState = BossState.Gravity;
-                isGravityStateInterruptible = false;
-                gravityCoroutine = StartCoroutine(GravitySequence());
+                
+            case BossState.Missile:
+                ActivateShield();
+                currentCoroutine = StartCoroutine(MissileCoroutine());
+                break;
+                
+            case BossState.Gravity:
+                DeactivateShield();
+                currentCoroutine = StartCoroutine(GravityCoroutine());
                 break;
         }
     }
-    
-    void EndCurrentState(){
-        if(isGravityActive) DeactivateGravity();
-        if(isLaserActive) DeactivateLasers();
+
+    void ExitState(){
+        if(currentCoroutine != null){
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+        
+        switch(currentState){
+            case BossState.UFO:
+                foreach(GameObject ufo in activeUFOs){
+                    if(ufo != null) ufo.SetActive(false);
+                }
+                activeUFOs.Clear();
+                DeactivateShield();
+                break;
+                
+            case BossState.Missile:
+                foreach(MissileController missile in activeMissiles){
+                    if(missile != null) missile.gameObject.SetActive(false);
+                }
+                activeMissiles.Clear();
+                DeactivateShield();
+                break;
+                
+            case BossState.Gravity:
+                DeactivateGravity();
+                DeactivateLasers();
+                DeactivateShield();
+                break;
+        }
     }
-    
-    IEnumerator SpawnUFOs(){
+
+    IEnumerator UFOCoroutine(){
         for(int i = 0; i < ufoSpawnCount; i++){
             if(isDefeated) yield break;
             
@@ -189,56 +262,129 @@ public class BossController : MonoBehaviour
             yield return new WaitForSeconds(ufoSpawnDelay);
         }
     }
-    
-    IEnumerator SpawnMissile(){
+
+    IEnumerator MissileCoroutine(){
+        int spawned = 0;
+        
         for(int i = 0; i < missileCount; i++){
             if(isDefeated) yield break;
             
-            if(!BuildingManager.Instance.HasUntargeted()) yield break;
+            Building target = GetClosestAvailableBuilding();
+            if(target == null) break;
             
-            Building targetBuilding = BuildingManager.Instance.GetUntargeted();
-            if(targetBuilding == null) yield break;
-            
-            GameObject missile = GetPooled(missilePool);
-            if(missile != null){
-                missile.transform.position = transform.position + Vector3.up * 3f;
-                missile.SetActive(true);
-                activeMissiles.Add(missile);
+            GameObject missileObj = GetPooled(missilePool);
+            if(missileObj != null){
+                missileObj.transform.position = transform.position + Vector3.up * 3f + Random.insideUnitSphere * 2f;
+                missileObj.SetActive(true);
                 
-                MissileController launcher = missile.GetComponent<MissileController>();
-                if(launcher != null) launcher.Initialize(targetBuilding);
+                MissileController missile = missileObj.GetComponent<MissileController>();
+                if(missile != null){
+                    missile.Initialize(target);
+                    activeMissiles.Add(missile);
+                    spawned++;
+                }
             }
-            yield return new WaitForSeconds(1f);
+            
+            yield return new WaitForSeconds(missileSpawnDelay);
+        }
+        
+        if(spawned == 0){
+            ExitState();
+            EnterState(BossState.Idle);
         }
     }
-        
-    IEnumerator GravitySequence(){
+
+    IEnumerator GravityCoroutine(){
         ActivateGravity();
         
         float chargeTimer = 0f;
-        while(chargeTimer < chargeTime && !isDefeated && isGravityActive){
+        while(chargeTimer < chargeTime && !isDefeated){
             chargeTimer += Time.deltaTime;
             yield return null;
         }
         
-        if(!isDefeated && isGravityActive){
-            isLaserActive = true;
+        if(!isDefeated){
             ActivateLasers();
             
             float laserTimer = 0f;
-            while(laserTimer < laserDuration && !isDefeated && isGravityActive){
+            while(laserTimer < laserDuration && !isDefeated){
                 laserTimer += Time.deltaTime;
                 yield return null;
             }
             
-            isLaserActive = false;
             DeactivateLasers();
         }
         
         DeactivateGravity();
-        currentState = BossState.Idle;
-        isGravityStateInterruptible = true;
-        gravityCoroutine = null;
+        
+        if(!isDefeated){
+            ExitState();
+            EnterState(BossState.Idle);
+        }
+    }
+
+    bool HasAvailableBuildings(){
+        if(BuildingManager.Instance == null) return false;
+        
+        foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
+            Building building = kvp.Key;
+            BuildingState state = kvp.Value;
+            if(building != null && building.IsAlive() && state != BuildingState.Destroyed){
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    Building GetClosestAvailableBuilding(){
+        if(BuildingManager.Instance == null) return null;
+        
+        Building closest = null;
+        float closestDistance = float.MaxValue;
+        
+        foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
+            Building building = kvp.Key;
+            BuildingState state = kvp.Value;
+            
+            if(building == null) continue;
+            if(!building.IsAlive()) continue;
+            if(state == BuildingState.Destroyed) continue;
+            
+            float distance = Vector3.Distance(transform.position, building.transform.position);
+            if(distance < closestDistance){
+                closestDistance = distance;
+                closest = building;
+            }
+        }
+        
+        return closest;
+    }
+    
+    void UpdateBuildingTargets(){
+        foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
+            Building building = kvp.Key;
+            if(building != null && building.isTargeted){
+                bool isTargeted = false;
+                foreach(MissileController missile in activeMissiles){
+                    if(missile != null && !missile.IsExploded() && missile.GetTargetBuilding() == building){
+                        isTargeted = true;
+                        break;
+                    }
+                }
+                
+                if(!isTargeted){
+                    BuildingManager.Instance.SetTargeted(building, false);
+                }
+            }
+        }
+    }
+    
+    void CleanupDeadEntities(){
+        activeUFOs.RemoveAll(u => u == null || !u.activeInHierarchy);
+        activeMissiles.RemoveAll(m => m == null || m.IsExploded());
+        
+        ufoPool.RemoveAll(obj => obj == null);
+        missilePool.RemoveAll(obj => obj == null);
     }
     
     void ActivateGravity(){
@@ -254,6 +400,7 @@ public class BossController : MonoBehaviour
     }
     
     void ActivateLasers(){
+        isLaserActive = true;
         if(laserFieldController != null && weakpointManager != null){
             List<Vector3> origins = weakpointManager.GetLaserOrigins();
             laserFieldController.ActivateLasers(origins);
@@ -265,51 +412,83 @@ public class BossController : MonoBehaviour
         if(laserFieldController != null) laserFieldController.DeactivateLasers();
     }
     
+    void ActivateShield(){
+        isShieldActive = true;
+        if(shieldCollider != null) shieldCollider.enabled = true;;
+        if(shieldSystem != null){
+            shieldSystem.ShowShield();
+            shieldSystem.SetDamageMultiplier(shieldDamageMultiplier);
+        }
+    }
+    
+    void DeactivateShield(){
+        isShieldActive = false;
+        if(shieldCollider != null) shieldCollider.enabled = false;
+        if(shieldSystem != null){
+            shieldSystem.HideShield();
+            shieldSystem.SetDamageMultiplier(1f);
+        }
+    }
+    
     void OnAllWeakPointsDestroyed(){
-        if(isGravityActive){
-            if(gravityCoroutine != null){
-                StopCoroutine(gravityCoroutine);
-                gravityCoroutine = null;
-            }
-            
-            DeactivateGravity();
-            DeactivateLasers();
-            currentState = BossState.Idle;
-            isGravityStateInterruptible = true;
+        if(currentState == BossState.Gravity){
+            ExitState();
+            EnterState(BossState.Idle);
         }
     }
     
     GameObject GetPooled(List<GameObject> pool){
+        pool.RemoveAll(obj => obj == null);
+        
         foreach(GameObject obj in pool){
-            if(!obj.activeInHierarchy) return obj;
+            if(obj != null && !obj.activeInHierarchy){
+                return obj;
+            }
         }
         return null;
-    }
-    
-    void CleanupDeadEntities(){
-        activeUFOs.RemoveAll(u => u == null || !u.activeInHierarchy);
-        activeMissiles.RemoveAll(m => m == null || !m.activeInHierarchy);
     }
     
     void Die(){
         if(isDefeated) return;
         isDefeated = true;
         
+        DeactivateShield();
+        
         if(deathEffect != null) deathEffect.Play();
         if(audioSource != null && deathSound != null) audioSource.PlayOneShot(deathSound);
         
-        foreach(GameObject ufo in activeUFOs) if(ufo != null) Destroy(ufo);
-        foreach(GameObject missile in activeMissiles) if(missile != null) Destroy(missile);
+        if(currentCoroutine != null){
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+        
+        foreach(GameObject ufo in activeUFOs){
+            if(ufo != null) ufo.SetActive(false);
+        }
+        activeUFOs.Clear();
+        
+        foreach(MissileController missile in activeMissiles){
+            if(missile != null) missile.gameObject.SetActive(false);
+        }
+        activeMissiles.Clear();
+        
         DeactivateLasers();
         if(weakpointManager != null) weakpointManager.DeactivateAll();
+        
+        foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
+            if(kvp.Key != null && kvp.Key.isTargeted){
+                BuildingManager.Instance.SetTargeted(kvp.Key, false);
+            }
+        }
         
         Destroy(gameObject, 3f);
     }
     
     #if UNITY_EDITOR
-    [Button("Force UFO")] void DebugUFO(){ if(!isDefeated) StartCoroutine(SpawnUFOs()); }
-    [Button("Force Missile")] void DebugMissile(){ if(!isDefeated) StartCoroutine(SpawnMissile()); }
-    [Button("Force Gravity")] void DebugGravity(){ if(!isDefeated) StartCoroutine(GravitySequence()); }
+    [Button("Force UFO")] void DebugUFO(){ if(!isDefeated){ ExitState(); EnterState(BossState.UFO); } }
+    [Button("Force Missile")] void DebugMissile(){ if(!isDefeated){ ExitState(); EnterState(BossState.Missile); } }
+    [Button("Force Gravity")] void DebugGravity(){ if(!isDefeated){ ExitState(); EnterState(BossState.Gravity); } }
+    [Button("Force Idle")] void DebugIdle(){ if(!isDefeated){ ExitState(); EnterState(BossState.Idle); } }
     [Button("Damage 50")] void DebugDamage(){ if(healthSystem != null) healthSystem.TakeDamage(50f); }
     #endif
 }
