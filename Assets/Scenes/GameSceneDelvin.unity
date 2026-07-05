@@ -1034,8 +1034,71 @@ Transform:
   - {fileID: 526502397}
   - {fileID: 831831217}
   - {fileID: 1898864200}
+  - {fileID: 216231813}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &216231812
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 191348999}
+    m_Modifications:
+    - target: {fileID: 1284862874056661269, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_Name
+      value: AudioManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 8.00678
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 16.6729
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -64.97723
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+--- !u!4 &216231813 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1673095708957452654, guid: 87f4394e92700e748aefdcd7d8d696ac, type: 3}
+  m_PrefabInstance: {fileID: 216231812}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &220648915
 GameObject:
   m_ObjectHideFlags: 0
@@ -2457,7 +2520,7 @@ Transform:
   m_GameObject: {fileID: 581393915}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 808.15796, y: -353.92725, z: 0}
+  m_LocalPosition: {x: 808.15796, y: -354.62286, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2894,11 +2957,13 @@ MonoBehaviour:
   ufoPoolSize: 10
   ufoSpawnCount: 3
   ufoSpawnDelay: 0.5
+  ufoSpawnPoints: []
   missilePrefab: {fileID: 5075748024934720823, guid: 2152362153b9c9c44ace4745a615bf40, type: 3}
   missileParent: {fileID: 1086881894}
   missilePoolSize: 5
   missileCount: 3
   missileSpawnDelay: 1
+  missileSpawnPoint: {fileID: 0}
   gravityFieldController: {fileID: 0}
   laserFieldController: {fileID: 0}
   weakpointManager: {fileID: 0}
@@ -4567,11 +4632,13 @@ MonoBehaviour:
   ufoPoolSize: 10
   ufoSpawnCount: 3
   ufoSpawnDelay: 0.5
+  ufoSpawnPoints: []
   missilePrefab: {fileID: 5075748024934720823, guid: 2152362153b9c9c44ace4745a615bf40, type: 3}
   missileParent: {fileID: 1086881894}
   missilePoolSize: 5
   missileCount: 3
   missileSpawnDelay: 1
+  missileSpawnPoint: {fileID: 0}
   gravityFieldController: {fileID: 1709089330}
   laserFieldController: {fileID: 1043311175}
   weakpointManager: {fileID: 1490474627}
@@ -5311,7 +5378,7 @@ Transform:
   m_GameObject: {fileID: 1069122234}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 424.46906, z: 0}
+  m_LocalPosition: {x: 0, y: 425.16467, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6917,7 +6984,7 @@ Transform:
   m_GameObject: {fileID: 1365976551}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -517.8903, z: 0}
+  m_LocalPosition: {x: 0, y: -518.5581, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7917,7 +7984,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 1.4799999, y: 3.25, z: -3}
-  m_LocalScale: {x: 0.0020269605, y: 0.0020269605, z: 0.0020269605}
+  m_LocalScale: {x: 0.0020243502, y: 0.0020243502, z: 0.0020243502}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1171249352}
@@ -7978,7 +8045,7 @@ MonoBehaviour:
         Raw: 1920
         Type: 0
       Y:
-        Raw: 1078.9381
+        Raw: 1080.3293
         Type: 0
       Z:
         Raw: 0
@@ -9693,7 +9760,7 @@ Transform:
   m_GameObject: {fileID: 1871069287}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 517.8902, z: 0}
+  m_LocalPosition: {x: 0, y: 518.5581, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
