@@ -31,6 +31,25 @@ public class SettingsManager : MonoBehaviour
 
     private void Start()
     {
+        // Register slider events
+        if (bgmSlider != null)
+        {
+            bgmSlider.OnValueChanged.AddListener(SetBGMVolume);
+        }
+
+        if (sfxSlider != null)
+        {
+            sfxSlider.OnValueChanged.AddListener(SetSFXVolume);
+        }
+
+        if (sensSlider != null)
+        {
+            sensSlider.OnValueChanged.AddListener(SetSensitivity);
+        }
+
+        // Load saved settings to UI
+        SetResolution(3);
+        LoadSettingsToUI();
         ApplyAllSettings();
     }
 

@@ -4,21 +4,9 @@ using System.Collections.Generic;
 public enum DroneState
 {
     Observing,
-    Repositioning,
-    ResupplyPreparing,
-    ResupplyTransferring,
-    ResupplyRetracting,
-    RegainingEnergy,
-    Searching
-}
-
-public enum ObjectivePriority
-{
-    Emergency,
-    RegainEnergy,
-    Resupply,
-    Reposition,
-    Observe
+    Charging,
+    Resupplying,
+    RechargingSelf
 }
 
 public class DroneLogic : MonoBehaviour
@@ -27,6 +15,7 @@ public class DroneLogic : MonoBehaviour
     [SerializeField] private Transform player;
     [SerializeField] private Rigidbody playerRb;
     [SerializeField] private EnergySystem playerEnergy;
+    [SerializeField] private Transform model;
 
     [Header("DRONE SETTINGS")]
     [SerializeField] private float followHeightAbovePlayer = 10f;
@@ -42,17 +31,14 @@ public class DroneLogic : MonoBehaviour
     [SerializeField] private float droneRechargeAltitude = 80f;
     
     [Header("RECHARGE THRESHOLDS")]
-    [SerializeField] private float minDroneEnergyToFunction = 20f;
-    [SerializeField] private float maxDroneEnergyToRecharge = 80f;
-    [SerializeField] private float playerEnergyCriticalThreshold = 20f;
-    [SerializeField] private float playerEnergyLowThreshold = 40f;
-    [SerializeField] private float playerEnergySafeThreshold = 70f;
+    [SerializeField] private float minDroneEnergyToFunction = 30f;
+    [SerializeField] private float playerEnergyCriticalThreshold = 10f;
+    [SerializeField] private float autoResupplyThreshold = 30f;
+    [SerializeField] private float autoResupplyCooldown = 5f;
 
     [Header("OBSERVATION")]
     [SerializeField] private float repositionCooldown = 5f;
     [SerializeField] private float repositionScoreGap = 0.5f;
-    [SerializeField] private float lostContactTime = 4f;
-    [SerializeField] private float maxSearchTime = 10f;
     [SerializeField] private float evaluationInterval = 0.25f;
 
     [Header("SCORING WEIGHTS")]
@@ -62,7 +48,6 @@ public class DroneLogic : MonoBehaviour
 
     [Header("MOVEMENT")]
     [SerializeField] private float observationSpeed = 10f;
-    [SerializeField] private float repositionSpeed = 12f;
     [SerializeField] private float resupplySpeed = 9f;
     [SerializeField] private float arrivalRadius = 5f;
     [SerializeField] private float stoppingRadius = 0.8f;
@@ -71,19 +56,14 @@ public class DroneLogic : MonoBehaviour
     [Header("RESUPPLY")]
     [SerializeField] private float resupplyDistance = 5f;
     [SerializeField] private float energyPerSecondToPlayer = 15f;
-    [SerializeField] private float transferDuration = 3f;
-    [SerializeField] private float autoCancelEnergyThreshold = 0.8f;
-    [SerializeField] private bool debugRope;
 
     [Header("CABLE")]
-    [SerializeField] private VerletRope verletRope;
+    [SerializeField] private SimpleCable cable;
 
     [Header("REFERENCES")]
     [SerializeField] private InputHandler input;
 
     private DroneState currentState = DroneState.Observing;
-    private ObjectivePriority activePriority = ObjectivePriority.Observe;
-    private DroneState previousState = DroneState.Observing;
 
     private Vector3 bestPosition;
     private float lastRepositionTime = -999f;
@@ -91,29 +71,18 @@ public class DroneLogic : MonoBehaviour
     private float bestScore;
 
     private float stateTimer;
-    private float lostContactTimer;
-    private float searchTimer;
     private float rechargeTimer;
     private bool isRechargingAtAltitude;
-
-    private bool manualResupplyRequested;
-    private bool previousManualRequest;
+    private bool isManualCharge;
+    private bool isManualResupply;
     private bool isAutoResupply;
-    private float resupplyStartTime;
+    private float lastAutoResupplyTime = -999f;
+    private bool wasManualChargeInterrupted;
 
     private Rigidbody rb;
-
-    private Vector3 lastKnownPlayerPosition;
-    private bool hasLastKnownPosition;
-
     private float evaluationTimer;
 
     void Awake(){
-        InitializeComponents();
-        InitializeState();
-    }
-
-    void InitializeComponents(){
         rb = GetComponent<Rigidbody>();
         if(rb != null){
             rb.useGravity = false;
@@ -121,18 +90,15 @@ public class DroneLogic : MonoBehaviour
             rb.interpolation = RigidbodyInterpolation.Interpolate;
         }
 
-        if(verletRope != null) verletRope.SetVisible(false);
+        if(cable != null) cable.SetVisible(false);
         if(playerRb == null && player != null) playerRb = player.GetComponent<Rigidbody>();
         if(playerEnergy == null && player != null) playerEnergy = player.GetComponent<EnergySystem>();
         if(input == null) input = FindFirstObjectByType<InputHandler>();
-    }
 
-    void InitializeState(){
         droneCurrentEnergy = droneMaxEnergy;
         bestPosition = transform.position;
-        lastKnownPlayerPosition = player != null ? player.position : transform.position;
-        hasLastKnownPosition = player != null;
         isRechargingAtAltitude = false;
+        wasManualChargeInterrupted = false;
         EvaluateBestPosition();
         UpdateCableVisibility();
     }
@@ -140,99 +106,170 @@ public class DroneLogic : MonoBehaviour
     void Update(){
         if(player == null) return;
 
-        HandleManualResupplyInput();
-        UpdatePriorities();
-        UpdateStateMachine();
-        UpdateCableVisibility();
+        HandleInput();
+        UpdateState();
+        UpdateCable();
     }
 
-    void HandleManualResupplyInput(){
-        bool currentRequest = input != null ? input.ResupplyPressed : Input.GetKeyDown(KeyCode.Tab);
-        
-        if(currentRequest && !previousManualRequest){
-            if(droneCurrentEnergy > 0 && currentState != DroneState.RegainingEnergy){
-                manualResupplyRequested = !manualResupplyRequested;
-                isAutoResupply = false;
-                
-                if(!manualResupplyRequested && IsResupplyState()){
-                    CancelResupply("Manual toggle off");
-                }
-            }
-            else{
-                Debug.Log($"Cannot resupply - Drone energy: {droneCurrentEnergy:F0}, State: {currentState}");
-                manualResupplyRequested = false;
-            }
+    void DrainEnergy(){
+        if(currentState == DroneState.Charging || 
+           currentState == DroneState.Resupplying || 
+           currentState == DroneState.RechargingSelf){
+            return;
         }
-        previousManualRequest = currentRequest;
+
+        droneCurrentEnergy -= droneEnergyDrainPerSecond * Time.deltaTime;
+        droneCurrentEnergy = Mathf.Max(0, droneCurrentEnergy);
     }
 
-    void UpdatePriorities(){
-        if(player == null) return;
+    void HandleInput(){
+        bool chargePressed = input != null ? input.ChargePressed : Input.GetKeyDown(KeyCode.C);
+        bool resupplyPressed = input != null ? input.ResupplyPressed : Input.GetKeyDown(KeyCode.F);
 
-        bool hasVisual = HasLineOfSight();
-
-        if(!hasVisual){
-            lostContactTimer += Time.deltaTime;
-            if(lostContactTimer > lostContactTime){
-                activePriority = ObjectivePriority.Emergency;
-                lastKnownPlayerPosition = player.position;
-                hasLastKnownPosition = true;
+        if(chargePressed){
+            if(currentState == DroneState.Charging && isManualCharge){
+                isManualCharge = false;
+                wasManualChargeInterrupted = false;
+                currentState = DroneState.Observing;
+                EvaluateBestPosition();
+                UpdateCableVisibility();
                 return;
             }
-        }
-        else{
-            lostContactTimer = 0f;
-            lastKnownPlayerPosition = player.position;
-            hasLastKnownPosition = true;
-        }
 
-        float playerEnergyPercent = playerEnergy != null ? (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f : 100f;
-        float droneEnergyPercent = (droneCurrentEnergy / droneMaxEnergy) * 100f;
-        
-        float targetDroneEnergy = CalculateTargetDroneEnergy(playerEnergyPercent);
-        bool needsRecharge = droneCurrentEnergy < targetDroneEnergy;
-        
-        bool droneCriticallyLow = droneCurrentEnergy < minDroneEnergyToFunction;
-        
-        bool shouldSmartRecharge = needsRecharge && 
-                                   playerEnergyPercent > playerEnergyLowThreshold &&
-                                   !manualResupplyRequested &&
-                                   currentState != DroneState.RegainingEnergy;
-
-        if(droneCriticallyLow || shouldSmartRecharge){
-            if(droneCriticallyLow || !IsResupplyState()){
-                activePriority = ObjectivePriority.RegainEnergy;
-                if(IsResupplyState())
-                    CancelResupply("Drone needs recharge");
-                return;
+            if(currentState != DroneState.Resupplying && currentState != DroneState.RechargingSelf){
+                isManualCharge = true;
+                isManualResupply = false;
+                wasManualChargeInterrupted = false;
+                currentState = DroneState.Charging;
+                rechargeTimer = 0f;
+                isRechargingAtAltitude = false;
+                UpdateCableVisibility();
             }
         }
 
-        bool playerNeedsEnergy = playerEnergy != null && playerEnergy.GetCurrentEnergy() <= playerEnergyLowThreshold;
-        bool playerCriticallyNeedsEnergy = playerEnergy != null && playerEnergy.GetCurrentEnergy() <= playerEnergyCriticalThreshold;
-        
-        if(manualResupplyRequested || playerNeedsEnergy){
-            if(droneCurrentEnergy > 0 || playerCriticallyNeedsEnergy){
-                bool playerCanAcceptEnergy = playerEnergy != null && 
-                                            playerEnergy.GetCurrentEnergy() < playerEnergy.MaxEnergy;
-                
-                if(playerCanAcceptEnergy || manualResupplyRequested){
-                    activePriority = ObjectivePriority.Resupply;
-                    if(playerNeedsEnergy && !manualResupplyRequested)
-                        isAutoResupply = true;
+        if(resupplyPressed){
+            if(currentState == DroneState.Resupplying && isManualResupply){
+                isManualResupply = false;
+                currentState = DroneState.Observing;
+                EvaluateBestPosition();
+                UpdateCableVisibility();
+                return;
+            }
+
+            if(currentState != DroneState.Resupplying && currentState != DroneState.RechargingSelf){
+                if(droneCurrentEnergy <= 0){
                     return;
                 }
-                else if(playerEnergy != null && playerEnergy.GetCurrentEnergy() >= playerEnergy.MaxEnergy){
-                    if(!manualResupplyRequested)
-                        isAutoResupply = false;
-                }
+
+                isManualResupply = true;
+                isManualCharge = false;
+                currentState = DroneState.Resupplying;
+                isAutoResupply = false;
+                UpdateCableVisibility();
             }
-            else{
-                if(manualResupplyRequested){
-                    manualResupplyRequested = false;
-                    Debug.Log("Cannot resupply - drone energy depleted");
-                }
+        }
+    }
+
+    void UpdateState(){
+        stateTimer += Time.deltaTime;
+
+        if(playerEnergy == null) return;
+
+        float playerPercent = (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f;
+        float dronePercent = (droneCurrentEnergy / droneMaxEnergy) * 100f;
+
+        bool playerCriticallyLow = playerPercent <= playerEnergyCriticalThreshold;
+        bool shouldAutoResupply = playerPercent > playerEnergyCriticalThreshold && 
+                                  playerPercent - dronePercent >= autoResupplyThreshold &&
+                                  Time.time - lastAutoResupplyTime > autoResupplyCooldown;
+
+        if(currentState == DroneState.Resupplying && isManualResupply){
+            ExecuteResupplying();
+            return;
+        }
+
+        if(currentState == DroneState.Charging && isManualCharge){
+            if(playerCriticallyLow){
+                wasManualChargeInterrupted = true;
+                isManualCharge = false;
+                currentState = DroneState.Resupplying;
+                isAutoResupply = true;
+                UpdateCableVisibility();
+                return;
             }
+
+            if(droneCurrentEnergy >= droneMaxEnergy){
+                if(wasManualChargeInterrupted){
+                    wasManualChargeInterrupted = false;
+                    isManualCharge = false;
+                    currentState = DroneState.Resupplying;
+                    isAutoResupply = true;
+                    UpdateCableVisibility();
+                    return;
+                }
+
+                isManualCharge = false;
+                currentState = DroneState.Observing;
+                EvaluateBestPosition();
+                UpdateCableVisibility();
+                return;
+            }
+
+            if(stateTimer > 5f && !isRechargingAtAltitude){
+                isRechargingAtAltitude = true;
+                rechargeTimer = 0f;
+            }
+
+            ExecuteCharging();
+            return;
+        }
+
+        if(playerCriticallyLow){
+            if(currentState != DroneState.Resupplying){
+                if(droneCurrentEnergy <= 0){
+                    currentState = DroneState.RechargingSelf;
+                    isRechargingAtAltitude = false;
+                    rechargeTimer = 0f;
+                    UpdateCableVisibility();
+                    return;
+                }
+
+                currentState = DroneState.Resupplying;
+                isAutoResupply = true;
+                UpdateCableVisibility();
+            }
+            
+            ExecuteResupplying();
+            return;
+        }
+
+        if(shouldAutoResupply){
+            if(currentState != DroneState.Resupplying && currentState != DroneState.RechargingSelf){
+                currentState = DroneState.Resupplying;
+                isAutoResupply = true;
+                UpdateCableVisibility();
+            }
+            
+            ExecuteResupplying();
+            return;
+        }
+
+        if(currentState == DroneState.RechargingSelf){
+            ExecuteRechargingSelf();
+            return;
+        }
+
+        if(wasManualChargeInterrupted){
+            if(droneCurrentEnergy >= droneMaxEnergy){
+                wasManualChargeInterrupted = false;
+                currentState = DroneState.Resupplying;
+                isAutoResupply = true;
+                UpdateCableVisibility();
+                return;
+            }
+
+            ExecuteCharging();
+            return;
         }
 
         evaluationTimer += Time.deltaTime;
@@ -242,319 +279,159 @@ public class DroneLogic : MonoBehaviour
             
             if(Time.time - lastRepositionTime > repositionCooldown &&
                 bestScore - currentScore > repositionScoreGap){
-                activePriority = ObjectivePriority.Reposition;
+                currentState = DroneState.Observing;
                 return;
             }
         }
 
-        activePriority = ObjectivePriority.Observe;
-    }
-
-    float CalculateTargetDroneEnergy(float playerEnergyPercent){
-        if(playerEnergyPercent >= playerEnergySafeThreshold)
-            return maxDroneEnergyToRecharge;
-        
-        if(playerEnergyPercent <= playerEnergyLowThreshold)
-            return minDroneEnergyToFunction;
-        
-        float t = Mathf.InverseLerp(playerEnergyLowThreshold, playerEnergySafeThreshold, playerEnergyPercent);
-        return Mathf.Lerp(minDroneEnergyToFunction, maxDroneEnergyToRecharge, t);
-    }
-
-    void UpdateStateMachine(){
-        stateTimer += Time.deltaTime;
-
-        DroneState newState = DetermineNextState();
-        
-        if(newState != currentState){
-            previousState = currentState;
-            currentState = newState;
-            stateTimer = 0f;
-            OnStateEnter(currentState);
-        }
-
-        ExecuteStateLogic();
-    }
-
-    DroneState DetermineNextState(){
-        switch (activePriority){
-            case ObjectivePriority.Emergency:
-                return DroneState.Searching;
-
-            case ObjectivePriority.RegainEnergy:
-                return DroneState.RegainingEnergy;
-
-            case ObjectivePriority.Resupply:
-                return DetermineResupplyState();
-
-            case ObjectivePriority.Reposition:
-                return DroneState.Repositioning;
-
-            case ObjectivePriority.Observe:
-            default:
-                return DroneState.Observing;
+        if(currentState == DroneState.Observing){
+            ExecuteObserving();
         }
     }
 
-    DroneState DetermineResupplyState(){
-        switch (currentState){
-            case DroneState.ResupplyPreparing:
-                if(ArrivedAtResupplyPosition())
-                    return DroneState.ResupplyTransferring;
-                break;
-
-            case DroneState.ResupplyTransferring:
-                bool transferComplete = stateTimer >= transferDuration ||
-                                       (playerEnergy != null && playerEnergy.GetCurrentEnergy() >= playerEnergy.MaxEnergy) ||
-                                       droneCurrentEnergy <= 0f;
-                
-                if(transferComplete)
-                    return DroneState.ResupplyRetracting;
-                break;
-
-            case DroneState.ResupplyRetracting:
-                if(Vector3.Distance(transform.position, bestPosition) < stoppingRadius * 1.5f)
-                    return DroneState.Observing;
-                break;
-
-            default:
-                return DroneState.ResupplyPreparing;
-        }
-
-        return currentState;
-    }
-
-    void OnStateEnter(DroneState state){
-        switch (state){
-            case DroneState.ResupplyPreparing:
-                resupplyStartTime = Time.time;
-                break;
-
-            case DroneState.ResupplyTransferring:
-                break;
-
-            case DroneState.ResupplyRetracting:
-                break;
-
-            case DroneState.Searching:
-                searchTimer = 0f;
-                break;
-
-            case DroneState.RegainingEnergy:
-                isRechargingAtAltitude = false;
-                rechargeTimer = 0f;
-                if(IsResupplyState())
-                    CancelResupply("Entering recharge state");
-                
-                float targetEnergy = CalculateTargetDroneEnergy(
-                    playerEnergy != null ? (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f : 100f
-                );
-                Debug.Log($"Starting recharge - Current: {droneCurrentEnergy:F0}, Target: {targetEnergy:F0}, Player Energy: {(playerEnergy != null ? playerEnergy.GetCurrentEnergy() : 0):F0}");
-                break;
-        }
-        
-        UpdateCableVisibility();
-    }
-
-    void ExecuteStateLogic(){
-        switch (currentState){
-            case DroneState.Observing:
-                ExecuteObserving();
-                break;
-
-            case DroneState.Repositioning:
-                ExecuteRepositioning();
-                break;
-
-            case DroneState.ResupplyPreparing:
-                ExecuteResupplyPreparing();
-                break;
-
-            case DroneState.ResupplyTransferring:
-                ExecuteResupplyTransferring();
-                break;
-
-            case DroneState.ResupplyRetracting:
-                ExecuteResupplyRetracting();
-                break;
-
-            case DroneState.RegainingEnergy:
-                ExecuteRegainingEnergy();
-                break;
-
-            case DroneState.Searching:
-                ExecuteSearching();
-                break;
-        }
-    }
-
-    void ExecuteObserving(){
-        if(Vector3.Distance(transform.position, bestPosition) > stoppingRadius * 1.5f){
-            activePriority = ObjectivePriority.Reposition;
-        }
-    }
-
-    void ExecuteRepositioning(){
-        if(Vector3.Distance(transform.position, bestPosition) < stoppingRadius){
-            lastRepositionTime = Time.time;
-        }
-    }
-
-    void ExecuteResupplyPreparing(){
-        if(ShouldCancelResupply()){
-            CancelResupply("Cancellation condition met");
-        }
-    }
-
-    void ExecuteResupplyTransferring(){
-        if(ShouldCancelResupply()){
-            CancelResupply("Cancellation condition met");
-            return;
-        }
-
-        if(!debugRope) TransferEnergy();
-    }
-
-    void ExecuteResupplyRetracting(){
-    }
-
-    void ExecuteRegainingEnergy(){
+    void ExecuteCharging(){
         Vector3 rechargeTarget = transform.position;
         rechargeTarget.y = Mathf.Min(droneRechargeAltitude, maxHeightAboveTerrain);
         
         float distanceToTarget = Vector3.Distance(transform.position, rechargeTarget);
         float rechargeStartThreshold = stoppingRadius * 3f;
         
-        if(distanceToTarget < rechargeStartThreshold){
+        if(distanceToTarget < rechargeStartThreshold || isRechargingAtAltitude){
             if(!isRechargingAtAltitude){
                 isRechargingAtAltitude = true;
                 rechargeTimer = 0f;
-                Debug.Log($"Drone started recharging at altitude {transform.position.y:F1}");
             }
-            
-            float playerEnergyPercent = playerEnergy != null ? (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f : 100f;
-            float targetEnergy = CalculateTargetDroneEnergy(playerEnergyPercent);
             
             float rechargeAmount = droneRechargeRate * Time.deltaTime;
-            droneCurrentEnergy = Mathf.Min(droneCurrentEnergy + rechargeAmount, targetEnergy);
+            droneCurrentEnergy = Mathf.Min(droneCurrentEnergy + rechargeAmount, droneMaxEnergy);
             rechargeTimer += Time.deltaTime;
             
-            if(droneCurrentEnergy >= targetEnergy - 0.5f){
-                Debug.Log($"Drone reached target energy: {droneCurrentEnergy:F0}/{targetEnergy:F0} (Player Energy: {playerEnergyPercent:F0}%)");
-                currentState = DroneState.Observing;
-                EvaluateBestPosition();
-                UpdateCableVisibility();
+            rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, Vector3.zero, observationSpeed * Time.fixedDeltaTime);
+        }
+        else{
+            isRechargingAtAltitude = false;
+            Vector3 toTarget = rechargeTarget - transform.position;
+            float dist = toTarget.magnitude;
+            
+            if(dist > stoppingRadius){
+                float arrivalFactor = Mathf.Clamp01((dist - stoppingRadius) / (arrivalRadius - stoppingRadius));
+                float desiredSpeed = Mathf.Lerp(0, observationSpeed, arrivalFactor);
+                Vector3 desiredVelocity = toTarget.normalized * desiredSpeed;
+                rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, desiredVelocity, observationSpeed * Time.fixedDeltaTime);
             }
         }
-        else isRechargingAtAltitude = false;
+
+        FacePlayer();
     }
 
-    void ExecuteSearching(){
-        searchTimer += Time.deltaTime;
+    void ExecuteResupplying(){
+        float playerPercent = (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f;
 
-        if(HasLineOfSight()){
-            currentState = DroneState.Observing;
-            lostContactTimer = 0f;
-            EvaluateBestPosition();
+        if(droneCurrentEnergy <= 0){
+            currentState = DroneState.RechargingSelf;
+            isRechargingAtAltitude = false;
+            rechargeTimer = 0f;
             UpdateCableVisibility();
             return;
         }
 
-        if(searchTimer > maxSearchTime){
-            if(hasLastKnownPosition){
-                bestPosition = lastKnownPlayerPosition + Vector3.up * followHeightAbovePlayer;
-                currentState = DroneState.Repositioning;
-                searchTimer = 0f;
-                UpdateCableVisibility();
-            }
-        }
-    }
-
-    bool ShouldCancelResupply(){
-        if(droneCurrentEnergy <= 0) return true;
-        if(playerEnergy == null || player == null) return true;
-
-        if(!manualResupplyRequested && isAutoResupply){
-            if(playerEnergy != null && 
-                playerEnergy.GetCurrentEnergy() >= playerEnergy.MaxEnergy * autoCancelEnergyThreshold){
-                return true;
-            }
+        if(playerPercent >= 100f){
+            currentState = DroneState.Observing;
+            isAutoResupply = false;
+            isManualResupply = false;
+            lastAutoResupplyTime = Time.time;
+            UpdateCableVisibility();
+            EvaluateBestPosition();
+            return;
         }
 
-        return false;
-    }
-
-    void UpdateCableVisibility(){
-        if(verletRope == null) return;
+        Vector3 toPlayer = player.position - transform.position;
+        float distToPlayer = toPlayer.magnitude;
         
-        bool shouldBeVisible = currentState == DroneState.ResupplyTransferring;
-        verletRope.SetVisible(shouldBeVisible);
-    }
+        if(distToPlayer > 2f){
+            Vector3 desiredVelocity = toPlayer.normalized * resupplySpeed;
+            rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, desiredVelocity, resupplySpeed * Time.fixedDeltaTime);
+        }
+        else{
+            rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, Vector3.zero, resupplySpeed * Time.fixedDeltaTime);
+            TransferEnergy();
+        }
 
-    void FixedUpdate(){
-        if(player == null) return;
-
-        Vector3 targetPosition = CalculateTargetPosition();
-        float speed = CalculateMovementSpeed();
-
-        MoveDrone(targetPosition, speed);
         FacePlayer();
     }
 
-    Vector3 CalculateTargetPosition(){
-        switch (currentState){
-            case DroneState.Observing:
-            case DroneState.Repositioning:
-            case DroneState.ResupplyRetracting:
-                return bestPosition;
-
-            case DroneState.ResupplyPreparing:
-            case DroneState.ResupplyTransferring:
-                return GetResupplyTarget();
-
-            case DroneState.RegainingEnergy:
-                Vector3 rechargeTarget = transform.position;
-                rechargeTarget.y = Mathf.Min(droneRechargeAltitude, maxHeightAboveTerrain);
-                return rechargeTarget;
-
-            case DroneState.Searching:
-                return GetSearchTarget();
-
-            default:
-                return transform.position;
-        }
-    }
-
-    float CalculateMovementSpeed(){
-        switch (currentState){
-            case DroneState.Observing:
-                return observationSpeed;
-            case DroneState.Repositioning:
-                return repositionSpeed;
-            case DroneState.ResupplyPreparing:
-            case DroneState.ResupplyTransferring:
-            case DroneState.ResupplyRetracting:
-                return resupplySpeed;
-            case DroneState.RegainingEnergy:
-            case DroneState.Searching:
-                return repositionSpeed;
-            default:
-                return observationSpeed;
-        }
-    }
-
-    void MoveDrone(Vector3 targetPosition, float speed){
-        Vector3 toTarget = targetPosition - transform.position;
-        float dist = toTarget.magnitude;
-
-        if(dist > stoppingRadius){
-            float arrivalFactor = Mathf.Clamp01((dist - stoppingRadius) / (arrivalRadius - stoppingRadius));
-            float desiredSpeed = Mathf.Lerp(0, speed, arrivalFactor);
+    void ExecuteRechargingSelf(){
+        Vector3 rechargeTarget = transform.position;
+        rechargeTarget.y = Mathf.Min(droneRechargeAltitude, maxHeightAboveTerrain);
+        
+        float distanceToTarget = Vector3.Distance(transform.position, rechargeTarget);
+        float rechargeStartThreshold = stoppingRadius * 3f;
+        
+        if(distanceToTarget < rechargeStartThreshold || isRechargingAtAltitude){
+            if(!isRechargingAtAltitude){
+                isRechargingAtAltitude = true;
+                rechargeTimer = 0f;
+            }
             
-            Vector3 desiredVelocity = toTarget.normalized * desiredSpeed;
-            rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, desiredVelocity, speed * Time.fixedDeltaTime);
+            float rechargeAmount = droneRechargeRate * Time.deltaTime;
+            droneCurrentEnergy = Mathf.Min(droneCurrentEnergy + rechargeAmount, droneMaxEnergy);
+            rechargeTimer += Time.deltaTime;
+            
+            rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, Vector3.zero, observationSpeed * Time.fixedDeltaTime);
+            
+            if(droneCurrentEnergy >= minDroneEnergyToFunction){
+                float playerPercent = (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f;
+                isRechargingAtAltitude = false;
+                
+                if(playerPercent <= playerEnergyCriticalThreshold){
+                    currentState = DroneState.Resupplying;
+                    isAutoResupply = true;
+                    UpdateCableVisibility();
+                }
+                else{
+                    currentState = DroneState.Observing;
+                    EvaluateBestPosition();
+                    UpdateCableVisibility();
+                }
+            }
         }
-        else rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, Vector3.zero, speed * Time.fixedDeltaTime);
+        else{
+            isRechargingAtAltitude = false;
+            Vector3 toTarget = rechargeTarget - transform.position;
+            float dist = toTarget.magnitude;
+            
+            if(dist > stoppingRadius){
+                float arrivalFactor = Mathf.Clamp01((dist - stoppingRadius) / (arrivalRadius - stoppingRadius));
+                float desiredSpeed = Mathf.Lerp(0, observationSpeed, arrivalFactor);
+                Vector3 desiredVelocity = toTarget.normalized * desiredSpeed;
+                rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, desiredVelocity, observationSpeed * Time.fixedDeltaTime);
+            }
+        }
+
+        FacePlayer();
+    }
+
+    void ExecuteObserving(){
+        if(Vector3.Distance(transform.position, bestPosition) > stoppingRadius * 1.5f){
+            Vector3 toTarget = bestPosition - transform.position;
+            float dist = toTarget.magnitude;
+            
+            if(dist > stoppingRadius){
+                float arrivalFactor = Mathf.Clamp01((dist - stoppingRadius) / (arrivalRadius - stoppingRadius));
+                float desiredSpeed = Mathf.Lerp(0, observationSpeed, arrivalFactor);
+                Vector3 desiredVelocity = toTarget.normalized * desiredSpeed;
+                rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, desiredVelocity, observationSpeed * Time.fixedDeltaTime);
+            }
+            else{
+                rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, Vector3.zero, observationSpeed * Time.fixedDeltaTime);
+                lastRepositionTime = Time.time;
+            }
+        }
+        else{
+            rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, Vector3.zero, observationSpeed * Time.fixedDeltaTime);
+        }
+
+        FacePlayer();
     }
 
     void FacePlayer(){
@@ -660,9 +537,6 @@ public class DroneLogic : MonoBehaviour
         return 0f;
     }
 
-    bool HasLineOfSight() => EvaluateLineOfSight(transform.position) > 0.5f;
-    bool ArrivedAtResupplyPosition() => Vector3.Distance(transform.position, GetResupplyTarget()) <= stoppingRadius * 1.2f;
-
     Vector3 GetResupplyTarget(){
         if(player == null) return transform.position;
         
@@ -674,54 +548,53 @@ public class DroneLogic : MonoBehaviour
         if(playerEnergy == null || droneCurrentEnergy <= 0f) return;
         
         float dist = Vector3.Distance(transform.position, player.position);
-        float transferRange = resupplyDistance + 1f;
         
-        if(dist <= transferRange){
+        if(dist <= 5f){
             float amount = energyPerSecondToPlayer * Time.deltaTime;
-            float actualAmount = Mathf.Min(amount, playerEnergy.MaxEnergy - playerEnergy.GetCurrentEnergy());
-            actualAmount = Mathf.Min(actualAmount, droneCurrentEnergy);
+            float spaceInPlayer = playerEnergy.MaxEnergy - playerEnergy.GetCurrentEnergy();
+            float actualAmount = Mathf.Min(amount, spaceInPlayer, droneCurrentEnergy);
             
             if(actualAmount > 0){
                 playerEnergy.Restore(actualAmount);
-                droneCurrentEnergy -= actualAmount * (droneEnergyDrainPerSecond / energyPerSecondToPlayer);
+                droneCurrentEnergy -= actualAmount;
                 droneCurrentEnergy = Mathf.Max(0, droneCurrentEnergy);
             }
         }
     }
 
-    void CancelResupply(string reason = ""){
-        currentState = DroneState.Observing;
-        manualResupplyRequested = false;
-        isAutoResupply = false;
-        UpdateCableVisibility();
+    public float GetCurrentEnergy() => droneCurrentEnergy;
+
+    void UpdateCable(){
+        if(cable == null) return;
         
-        if(!string.IsNullOrEmpty(reason))
-            Debug.Log($"Resupply cancelled: {reason}");
+        bool shouldBeVisible = currentState == DroneState.Resupplying;
+        
+        if(shouldBeVisible){
+            float dist = Vector3.Distance(transform.position, player.position);
+            if(dist > 10f){
+                currentState = DroneState.Observing;
+                isManualResupply = false;
+                isAutoResupply = false;
+                shouldBeVisible = false;
+                UpdateCableVisibility();
+            }
+        }
+        
+        cable.SetVisible(shouldBeVisible);
+        if(shouldBeVisible) cable.SetEndpoints(transform, player);
     }
 
-    bool IsResupplyState(){
-        return currentState == DroneState.ResupplyPreparing ||
-               currentState == DroneState.ResupplyTransferring ||
-               currentState == DroneState.ResupplyRetracting;
-    }
-
-    Vector3 GetSearchTarget(){
-        if(player == null) return transform.position;
+    void UpdateCableVisibility(){
+        if(cable == null) return;
         
-        float orbitRadius = idealHorizontalDistance;
-        float angle = Time.time * 30f * Mathf.Deg2Rad;
-        
-        Vector3 center = hasLastKnownPosition ? lastKnownPlayerPosition : player.position;
-        Vector3 orbitPos = center + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * orbitRadius;
-        orbitPos.y = center.y + followHeightAbovePlayer;
-        
-        return orbitPos;
+        bool shouldBeVisible = currentState == DroneState.Resupplying;
+        cable.SetVisible(shouldBeVisible);
     }
 
     public DroneState GetCurrentState() => currentState;
     public float GetDroneEnergy() => droneCurrentEnergy;
     public float GetDroneMaxEnergy() => droneMaxEnergy;
-    public bool IsResupplying() => IsResupplyState();
+    public bool IsResupplying() => currentState == DroneState.Resupplying;
 
 #if UNITY_EDITOR
     void OnDrawGizmosSelected(){
@@ -738,23 +611,22 @@ public class DroneLogic : MonoBehaviour
         Vector3 rechargePos = new Vector3(player.position.x, Mathf.Min(droneRechargeAltitude, maxHeightAboveTerrain), player.position.z);
         Gizmos.DrawWireSphere(rechargePos, 2f);
 
-        if(IsResupplyState()){
+        if(currentState == DroneState.Resupplying){
             Gizmos.color = Color.magenta;
             Vector3 resupplyPos = GetResupplyTarget();
             Gizmos.DrawWireSphere(resupplyPos, 1f);
-            Gizmos.DrawLine(transform.position, resupplyPos);
+            Gizmos.DrawLine(model.transform.position, resupplyPos);
         }
 
-        float playerEnergyPercent = playerEnergy != null ? (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f : 100f;
-        float targetDroneEnergy = CalculateTargetDroneEnergy(playerEnergyPercent);
+        float playerPercent = playerEnergy != null ? (playerEnergy.GetCurrentEnergy() / playerEnergy.MaxEnergy) * 100f : 100f;
+        float dronePercent = (droneCurrentEnergy / droneMaxEnergy) * 100f;
         
         UnityEditor.Handles.Label(transform.position + Vector3.up * 5f,
             $"State: {currentState}\n" +
-            $"Priority: {activePriority}\n" +
-            $"Drone Energy: {droneCurrentEnergy:F0}/{droneMaxEnergy:F0}\n" +
-            $"Target Energy: {targetDroneEnergy:F0}\n" +
-            $"Player Energy: {playerEnergyPercent:F0}%\n" +
-            $"Recharging: {isRechargingAtAltitude}\n" +
+            $"Drone Energy: {dronePercent:F0}%\n" +
+            $"Player Energy: {playerPercent:F0}%\n" +
+            $"Manual Charge: {isManualCharge}\n" +
+            $"Manual Resupply: {isManualResupply}\n" +
             $"Y: {transform.position.y:F1}");
     }
 #endif

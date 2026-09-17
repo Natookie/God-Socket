@@ -75,6 +75,7 @@ public class BossController : MonoBehaviour
 
     void Start(){
         CreatePools();
+        enableDebugInput = false;
         
         if(player == null){
             GameObject p = GameObject.FindGameObjectWithTag("Player");
@@ -96,10 +97,10 @@ public class BossController : MonoBehaviour
         stateTimer = 0f;
         stateCounter = 0;
         hasStarted = false;
-        
-        StartCoroutine(InitialDelayCoroutine());
     }
     
+    public void CallDelay() => StartCoroutine(InitialDelayCoroutine());
+
     IEnumerator InitialDelayCoroutine(){
         yield return new WaitForSeconds(initialDelay);
         hasStarted = true;
@@ -138,7 +139,7 @@ public class BossController : MonoBehaviour
     void Update(){
         if(isDefeated || player == null) return;
         if(enableDebugInput) HandleDebugInput();
-        if(disableLogic) return;
+        if(GameManager.Instance.currentState == GameManager.GameState.Menu || GameManager.Instance.currentState == GameManager.GameState.GameOver) return;
 
         if(!hasStarted) return;
         
@@ -248,12 +249,14 @@ public class BossController : MonoBehaviour
             case BossState.Idle:
                 DeactivateShield();
                 bossAimer.SetIdle(true);
+                TutorialUI.Instance.showTutorial(-1, "Ship is stunned, shoot it!");
                 break;
                 
             case BossState.UFO:
                 ActivateShield();
                 currentCoroutine = StartCoroutine(UFOCoroutine());
                 bossAimer.SetIdle(false);
+                TutorialUI.Instance.showTutorial(1, "Minnions incoming, defend yourself");
                 break;
                 
             case BossState.Missile:
@@ -261,11 +264,13 @@ public class BossController : MonoBehaviour
                 ActivateShield();
                 currentCoroutine = StartCoroutine(MissileCoroutine());
                 bossAimer.SetIdle(false);
+                TutorialUI.Instance.showTutorial(0, "Missile incoming, you can mount the rocket and pressing space to release it");
                 break;
                 
             case BossState.Gravity:
                 DeactivateShield();
                 currentCoroutine = StartCoroutine(GravityCoroutine());
+                TutorialUI.Instance.showTutorial(2, "WARNING!! Destroy all 4 glowing core on the ship chamber");
                 break;
         }
     }
@@ -274,6 +279,7 @@ public class BossController : MonoBehaviour
         if(currentCoroutine != null){
             StopCoroutine(currentCoroutine);
             currentCoroutine = null;
+            TutorialUI.Instance.HideTutorial();
         }
         
         switch(currentState){
@@ -464,21 +470,27 @@ public class BossController : MonoBehaviour
     }
     
     void UpdateBuildingTargets(){
+        List<Building> toUntarget = new List<Building>();
+        
         foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
             Building building = kvp.Key;
-            if(building != null && building.isTargeted){
-                bool isTargeted = false;
-                foreach(MissileController missile in activeMissiles){
-                    if(missile != null && !missile.IsExploded() && missile.GetTargetBuilding() == building){
-                        isTargeted = true;
-                        break;
-                    }
-                }
-                
-                if(!isTargeted){
-                    BuildingManager.Instance.SetTargeted(building, false);
+            if(building == null || !building.isTargeted) continue;
+            
+            bool stillTargeted = false;
+            foreach(MissileController missile in activeMissiles){
+                if(missile != null && !missile.IsExploded() && missile.GetTargetBuilding() == building){
+                    stillTargeted = true;
+                    break;
                 }
             }
+            
+            if(!stillTargeted){
+                toUntarget.Add(building);
+            }
+        }
+        
+        foreach(Building building in toUntarget){
+            BuildingManager.Instance.SetTargeted(building, false);
         }
     }
     
@@ -593,20 +605,23 @@ public class BossController : MonoBehaviour
         DeactivateLasers();
         if(weakpointManager != null) weakpointManager.DeactivateAll();
         
+        List<Building> toUntarget = new List<Building>();
         foreach(var kvp in BuildingManager.Instance.GetBuildingStates()){
             if(kvp.Key != null && kvp.Key.isTargeted){
-                BuildingManager.Instance.SetTargeted(kvp.Key, false);
+                toUntarget.Add(kvp.Key);
             }
+        }
+        
+        foreach(Building building in toUntarget){
+            BuildingManager.Instance.SetTargeted(building, false);
         }
         
         Destroy(gameObject, 3f);
     }
     
-    #if UNITY_EDITOR
     [Button("Force UFO")] void DebugUFO(){ if(!isDefeated){ ExitState(); EnterState(BossState.UFO); } }
     [Button("Force Missile")] void DebugMissile(){ if(!isDefeated){ ExitState(); EnterState(BossState.Missile); } }
     [Button("Force Gravity")] void DebugGravity(){ if(!isDefeated){ ExitState(); EnterState(BossState.Gravity); } }
     [Button("Force Idle")] void DebugIdle(){ if(!isDefeated){ ExitState(); EnterState(BossState.Idle); } }
     [Button("Damage 50")] void DebugDamage(){ if(healthSystem != null) healthSystem.TakeDamage(50f); }
-    #endif
 }

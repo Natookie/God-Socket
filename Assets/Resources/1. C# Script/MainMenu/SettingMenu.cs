@@ -15,7 +15,7 @@ public class SettingsMenu : MonoBehaviour
     [Header("Motion Blur")]
     public GameObject motionBlurObject;
 
-    private Resolution[] resolutions;
+    private Resolution[] resolutions;   
     private List<Resolution> filteredResolutions = new List<Resolution>();
 
     private void Start()
@@ -175,7 +175,7 @@ public class SettingsMenu : MonoBehaviour
 
         if (AudioManager.Instance != null)
         {
-            AudioManager.Instance.SetBGMVolume(value);
+            AudioManager.Instance.SetMasterVolume(value);
         }
 
         Debug.Log("Audio changed to: " + value);

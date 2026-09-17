@@ -43,6 +43,8 @@ public class PlayerController : MonoBehaviour, IDamageable
     }
 
     void Update(){
+        if(GameManager.Instance.currentState == GameManager.GameState.Menu || GameManager.Instance.currentState == GameManager.GameState.GameOver) return;
+        
         if(input.CursorVisible != cursorModeActive){
             cursorModeActive = input.CursorVisible;
             if(cursorModeActive){

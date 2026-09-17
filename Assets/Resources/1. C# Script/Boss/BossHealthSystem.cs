@@ -18,7 +18,10 @@ public class BossHealthSystem : MonoBehaviour, IDamageable
     }
 
     public void TakeDamage(float damage){
-        if(currentHealth <= 0f) return;
+        if(currentHealth <= 0f){
+            GameManager.Instance.GameOver("You Defeated the boss");
+            return;
+        }
 
         currentHealth -= damage;
         bossUI.UpdateUI(currentHealth/maxHealth);

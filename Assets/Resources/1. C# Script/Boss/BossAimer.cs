@@ -187,41 +187,41 @@ public class BossAimer : MonoBehaviour
         if(showDebugLogs) Debug.Log("BossAimer: Aiming reset");
     }
     
-    void OnDrawGizmosSelected(){
-        if(target != null){
-            Gizmos.color = Color.red;
-            Gizmos.DrawLine(transform.position, target.position);
-            Gizmos.DrawWireSphere(target.position, 0.5f);
+    // void OnDrawGizmosSelected(){
+        // if(target != null){
+        //     Gizmos.color = Color.red;
+        //     Gizmos.DrawLine(transform.position, target.position);
+        //     Gizmos.DrawWireSphere(target.position, 0.5f);
             
-            UnityEditor.Handles.Label(target.position + Vector3.up * 1f, $"Target: {target.name}");
-        }
-        else{
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(transform.position, 1f);
-            UnityEditor.Handles.Label(transform.position + Vector3.up * 1.5f, "NO TARGET");
-        }
+        //     UnityEditor.Handles.Label(target.position + Vector3.up * 1f, $"Target: {target.name}");
+        // }
+        // else{
+        //     Gizmos.color = Color.yellow;
+        //     Gizmos.DrawWireSphere(transform.position, 1f);
+        //     UnityEditor.Handles.Label(transform.position + Vector3.up * 1.5f, "NO TARGET");
+        // }
         
-        if(BuildingManager.Instance != null){
-            foreach(Building building in BuildingManager.Instance.buildings){
-                if(building == null) continue;
+        // if(BuildingManager.Instance != null){
+        //     foreach(Building building in BuildingManager.Instance.buildings){
+        //         if(building == null) continue;
                 
-                if(building.IsAlive()){
-                    if(building.isTargeted){
-                        Gizmos.color = Color.red;
-                        Gizmos.DrawWireSphere(building.transform.position, 0.5f);
-                        UnityEditor.Handles.Label(building.transform.position + Vector3.up * 0.5f, $"TARGETED: {building.name}");
-                    }
-                    else{
-                        Gizmos.color = Color.green;
-                        Gizmos.DrawWireSphere(building.transform.position, 0.3f);
-                    }
-                }
-                else{
-                    Gizmos.color = Color.gray;
-                    Gizmos.DrawWireSphere(building.transform.position, 0.2f);
-                    UnityEditor.Handles.Label(building.transform.position + Vector3.up * 0.5f, $"DESTROYED: {building.name}");
-                }
-            }
-        }
-    }
+        //         if(building.IsAlive()){
+        //             if(building.isTargeted){
+        //                 Gizmos.color = Color.red;
+        //                 Gizmos.DrawWireSphere(building.transform.position, 0.5f);
+        //                 UnityEditor.Handles.Label(building.transform.position + Vector3.up * 0.5f, $"TARGETED: {building.name}");
+        //             }
+        //             else{
+        //                 Gizmos.color = Color.green;
+        //                 Gizmos.DrawWireSphere(building.transform.position, 0.3f);
+        //             }
+        //         }
+        //         else{
+        //             Gizmos.color = Color.gray;
+        //             Gizmos.DrawWireSphere(building.transform.position, 0.2f);
+        //             UnityEditor.Handles.Label(building.transform.position + Vector3.up * 0.5f, $"DESTROYED: {building.name}");
+        //         }
+        //     }
+        // }
+    // }
 }

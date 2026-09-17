@@ -24,6 +24,7 @@ public class CameraAutoAim : MonoBehaviour
     public float cameraHeightOffset = 3f;
 
     private Transform currentTarget;
+    private IDamageable currentDamageable;
     private float targetLockTimer;
     private float targetLockDuration = 0.5f;
 
@@ -37,12 +38,14 @@ public class CameraAutoAim : MonoBehaviour
     private class EnemyCandidate
     {
         public Transform transform;
+        public IDamageable damageable;
         public float distance;
         public float angle;
         public float score;
         
-        public EnemyCandidate(Transform t, float dist, float ang){
+        public EnemyCandidate(Transform t, IDamageable d, float dist, float ang){
             transform = t;
+            damageable = d;
             distance = dist;
             angle = ang;
             score = 0f;
@@ -88,11 +91,11 @@ public class CameraAutoAim : MonoBehaviour
                 float currentScore = GetCandidateScore(currentTarget);
                 float newScore = bestCandidate.score;
 
-                if(newScore > currentScore + targetSwitchHysteresis) SwitchTarget(bestCandidate.transform);
+                if(newScore > currentScore + targetSwitchHysteresis) SwitchTarget(bestCandidate);
                 else targetLockTimer = targetLockDuration;
             }
             else if(currentTarget == null){
-                SwitchTarget(bestCandidate.transform);
+                SwitchTarget(bestCandidate);
             }
             else{
                 targetLockTimer = targetLockDuration;
@@ -116,14 +119,16 @@ public class CameraAutoAim : MonoBehaviour
         }
     }
 
-    void SwitchTarget(Transform newTarget){
-        currentTarget = newTarget;
+    void SwitchTarget(EnemyCandidate candidate){
+        currentTarget = candidate.transform;
+        currentDamageable = candidate.damageable;
         targetLockTimer = targetLockDuration;
         isAutoAiming = true;
     }
 
     void ClearTarget(){
         currentTarget = null;
+        currentDamageable = null;
         targetLockTimer = 0f;
         isAutoAiming = false;
         enemyCache.Clear();
@@ -170,13 +175,18 @@ public class CameraAutoAim : MonoBehaviour
         
         foreach(Collider col in colliders){
             Transform t = col.transform;
+            IDamageable damageable = t.GetComponent<IDamageable>();
+            
+            if(damageable == null) continue;
+            if(!damageable.IsAlive()) continue;
+            
             Vector3 directionToEnemy = (t.position - cameraPos).normalized;
             float angle = Vector3.Angle(forward, directionToEnemy);
             
             if(angle <= maxAimAngle){
                 float distance = Vector3.Distance(cameraPos, t.position);
                 if(distance >= minAimDistance && distance <= autoAimRange){
-                    EnemyCandidate candidate = new EnemyCandidate(t, distance, angle);
+                    EnemyCandidate candidate = new EnemyCandidate(t, damageable, distance, angle);
                     float normalizedAngle = angle / maxAimAngle;
                     float normalizedDistance = distance / autoAimRange;
                     candidate.score = (1f - normalizedAngle) * angleWeight + (1f - normalizedDistance) * distanceWeight;
@@ -193,6 +203,8 @@ public class CameraAutoAim : MonoBehaviour
         
         foreach(EnemyCandidate candidate in enemyCache){
             if(candidate.transform != null && candidate.transform.gameObject.activeInHierarchy){
+                if(candidate.damageable == null || !candidate.damageable.IsAlive()) continue;
+                
                 float distance = Vector3.Distance(GetCameraPosition(), candidate.transform.position);
                 if(distance <= autoAimRange && distance >= minAimDistance) return candidate;
             }
@@ -202,6 +214,9 @@ public class CameraAutoAim : MonoBehaviour
 
     float GetCandidateScore(Transform target){
         if(target == null) return 0f;
+        
+        IDamageable damageable = target.GetComponent<IDamageable>();
+        if(damageable == null || !damageable.IsAlive()) return 0f;
         
         Vector3 cameraPos = GetCameraPosition();
         Vector3 forward = cameraTransform != null ? cameraTransform.forward : transform.forward;

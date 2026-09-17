@@ -123,6 +123,7 @@ public class UFOController : MonoBehaviour, IDamageable
         isReturningToSpawn = false;
         targetBuilding = null;
         spawnPosition = transform.position;
+        health = 30f;
         
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
@@ -333,6 +334,7 @@ public class UFOController : MonoBehaviour, IDamageable
         ) * fireDirection;
         
         GameObject projectile = Instantiate(projectilePrefab, firePoint.position, Quaternion.LookRotation(fireDirection));
+        if(AudioManager.Instance != null) AudioManager.Instance.PlaySFX(GameSFX.UfoGun);
         projectile.SetActive(true);
         
         EnemyProjectile proj = projectile.GetComponent<EnemyProjectile>();
@@ -610,6 +612,7 @@ public class UFOController : MonoBehaviour, IDamageable
         isDead = true;
         isActive = false;
         
+        if(AudioManager.Instance != null) AudioManager.Instance.PlaySFX(GameSFX.UfoDestroyed);
         if(deathParticles != null){
             deathParticles.transform.parent = null;
             deathParticles.Play();
@@ -620,6 +623,7 @@ public class UFOController : MonoBehaviour, IDamageable
         if(visualModel != null) visualModel.SetActive(false);
         
         gameObject.SetActive(false);
+        AudioManager.Instance.PlaySFX(GameSFX.UfoDestroyed);
     }
     
     void OnTriggerEnter(Collider other){

@@ -6,7 +6,9 @@ using UnityEngine.Rendering.Universal;
 public class EnergyUI : MonoBehaviour
 {
     [SerializeField] private TextBlock playerEnergyText;
-    [SerializeField] private TextBlock droneEnergyText;
+    [Space(10)]
+    [SerializeField] private UIBlock2D playerEnergyBlock;
+    [SerializeField] private UIBlock2D droneEnergyBlock;
     [Space(10)]
     [SerializeField] private DroneLogic drone;
     [SerializeField] private EnergySystem player;
@@ -31,6 +33,7 @@ public class EnergyUI : MonoBehaviour
 
     void Start(){
         UpdateTexts();
+        UpdateBlock();
     }
 
     void Update(){
@@ -38,6 +41,7 @@ public class EnergyUI : MonoBehaviour
         if(updateTimer >= UPDATE_INTERVAL){
             updateTimer = 0f;
             UpdateTexts();
+            UpdateBlock();
         }
     }
 
@@ -64,25 +68,39 @@ public class EnergyUI : MonoBehaviour
     }
 
     void UpdateTexts(){
-        float newPlayerEnergy = player != null ? player.GetCurrentEnergy() : 0f;
-        float newDroneEnergy = drone != null ? drone.GetDroneEnergy() : 0f;
-
-        if(!Mathf.Approximately(playerEnergy, newPlayerEnergy)){
-            playerEnergy = newPlayerEnergy;
-            string newText = $"Player Energy: {playerEnergy:F1}";
-            if(playerTextCache != newText){
-                playerTextCache = newText;
-                if(playerEnergyText != null) playerEnergyText.Text = playerTextCache;
+        if(player != null){
+            float newPlayerEnergy = player.GetCurrentEnergy();
+            if(!Mathf.Approximately(playerEnergy, newPlayerEnergy)){
+                playerEnergy = newPlayerEnergy;
+                string newText = $"Player Energy: {playerEnergy:F1}";
+                if(playerTextCache != newText){
+                    playerTextCache = newText;
+                    if(playerEnergyText != null) playerEnergyText.Text = playerTextCache;
+                }
             }
         }
 
-        if(!Mathf.Approximately(droneEnergy, newDroneEnergy)){
-            droneEnergy = newDroneEnergy;
-            string newText = $"Drone Energy : {droneEnergy:F1}";
-            if(droneTextCache != newText){
-                droneTextCache = newText;
-                if(droneEnergyText != null) droneEnergyText.Text = droneTextCache;
+        if(drone != null){
+            float newDroneEnergy = drone.GetCurrentEnergy();
+            if(!Mathf.Approximately(droneEnergy, newDroneEnergy)){
+                droneEnergy = newDroneEnergy;
+                string newText = $"Drone Energy: {droneEnergy:F1}";
+                if(droneTextCache != newText){
+                    droneTextCache = newText;
+                }
             }
+        }
+    }
+
+    void UpdateBlock(){
+        if(playerEnergyBlock != null && player != null){
+            float playerRatio = player.GetCurrentEnergy() / 100f;
+            playerEnergyBlock.Size.X.Percent = Mathf.Clamp01(playerRatio);
+        }
+
+        if(droneEnergyBlock != null && drone != null){
+            float droneRatio = drone.GetCurrentEnergy() / 200f;
+            droneEnergyBlock.Size.X.Percent = Mathf.Clamp01(droneRatio);
         }
     }
 }

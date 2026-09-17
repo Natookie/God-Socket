@@ -19,6 +19,9 @@ public class BuildingManager : MonoBehaviour
     [Header("GUI")]
     public bool showGUI = false;
 
+    int count = 0;
+    const int maxCount = 15;
+
     void Awake(){
         if(Instance != null){
             Destroy(gameObject);
@@ -66,6 +69,11 @@ public class BuildingManager : MonoBehaviour
             GUI.color = originalColor;
             yOffset += 25;
         }
+    }
+
+    public void OnBuildingDestroyed(){
+        count++;
+        if(count >= maxCount) GameManager.Instance.GameOver("You lose! 15 Buildings destroyed");
     }
 
     [Button("Populate Building List", enabledMode: EButtonEnableMode.Editor)]

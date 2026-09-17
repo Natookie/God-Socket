@@ -84,6 +84,8 @@ public class PlayerRotation : MonoBehaviour
     public bool IsAutoAiming() => autoAimActive;
 
     void FixedUpdate(){
+        if(GameManager.Instance.currentState == GameManager.GameState.Menu || GameManager.Instance.currentState == GameManager.GameState.GameOver) return;
+        
         if(input == null) return;
         if(input.CursorVisible) return;
 

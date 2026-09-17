@@ -79,6 +79,7 @@ public class Building : MonoBehaviour, IDamageable
         col.enabled = false;
         fullMesh.enabled = false;
         destroyed = true;
+        BuildingManager.Instance.OnBuildingDestroyed();
         if(!hasChild) return;
 
         Vector3 explosionOrigin = transform.position + Vector3.up * 2f;
@@ -101,6 +102,7 @@ public class Building : MonoBehaviour, IDamageable
 
     void PlayExplosionParticles(){
         if(explosionParticlePrefab == null) return;
+        if(AudioManager.Instance != null) AudioManager.Instance.PlaySFX(GameSFX.BuildingDestroyed);
 
         Bounds bounds = GetBuildingBounds();
         Vector3 bottomCenter = new Vector3(

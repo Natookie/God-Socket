@@ -3,6 +3,9 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 public class MovementController : MonoBehaviour
 {
+    [Header("MODEL")]
+    public Transform model;
+
     [Header("SPEED")]
     public float normalMaxSpeed = 10f;
     public float boostSpeedMultiplier = 2f;
@@ -19,12 +22,19 @@ public class MovementController : MonoBehaviour
     public float idleDamping = 2f;
     public float drag = 0.2f;
 
+    [Header("TILT")]
+    public float maxHorizontalTiltAngle = 15f;
+    public float maxVerticalTiltAngle = 45f;
+    public float tiltSmoothness = 8f;
+
     [Header("REFERENCES")]
     public Transform cameraTransform;
     public InputHandler input;
     public EnergySystem energy;
 
     private Rigidbody rb;
+    private Quaternion targetModelRotation;
+    private Quaternion baseModelRotation;
 
     private bool isOverheated;
     private bool boostActive;
@@ -100,16 +110,25 @@ public class MovementController : MonoBehaviour
         rb.useGravity = false;
         rb.linearDamping = drag;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        if(model != null){
+            baseModelRotation = model.localRotation;
+            targetModelRotation = baseModelRotation;
+        }
+    }
+
+    bool isAiming => input != null && input.AimHeld;
+    void Update(){
+        UpdateFlyingWindSound();
     }
 
     void FixedUpdate(){
         WorldMoveDirection = Vector3.zero;
-
+        if(GameManager.Instance.currentState == GameManager.GameState.Menu || GameManager.Instance.currentState == GameManager.GameState.GameOver) return;
         if(isOverheated || inputDisabled) return;
 
         HandleMovement();
-
-        bool isAiming = input != null && input.AimHeld;
+        UpdateModelTilt();
 
         if(isAiming != wasAiming){
             wasAiming = isAiming;
@@ -171,5 +190,34 @@ public class MovementController : MonoBehaviour
         }
 
         if(rb.linearVelocity.magnitude > currentMaxSpeed) rb.linearVelocity = rb.linearVelocity.normalized * currentMaxSpeed;
+    }
+
+    void UpdateFlyingWindSound(){
+        if(AudioManager.Instance == null) return;
+
+        bool isAiming = CameraController.Instance != null && CameraController.Instance.aiming;
+
+        bool shouldPlayWind =
+            boostActive &&
+            !isOverheated &&
+            !inputDisabled &&
+            !isAiming &&
+            rb.linearVelocity.magnitude > 0.5f;
+
+        AudioManager.Instance.SetFlyingWind(shouldPlayWind);
+    }
+
+    void UpdateModelTilt(){
+        if(model == null) return;
+        if(isAiming) return;
+
+        Vector3 moveInput = input.MoveDirection;
+
+        float targetTiltZ = -moveInput.x * maxHorizontalTiltAngle;
+        float targetTiltX = moveInput.z * maxVerticalTiltAngle;
+
+        Quaternion targetTilt = Quaternion.Euler(targetTiltX, 0f, targetTiltZ);
+        targetModelRotation = baseModelRotation * targetTilt;
+        model.localRotation = Quaternion.Slerp(model.localRotation, targetModelRotation, tiltSmoothness * Time.fixedDeltaTime);
     }
 }

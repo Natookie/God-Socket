@@ -13,7 +13,8 @@ public class InputHandler : MonoBehaviour
 
     [Header("ACTIONS")]
     public KeyCode boost = KeyCode.Space;
-    public KeyCode resupplyToggleKey = KeyCode.Tab;
+    public KeyCode chargeKey = KeyCode.C;
+    public KeyCode rechargeKey = KeyCode.F;
     public int aimMouseButton = 1;
     public int fireMouseButton = 0;
 
@@ -29,21 +30,31 @@ public class InputHandler : MonoBehaviour
     public float MouseX { get; private set; }
     public float MouseY { get; private set; }
     public bool CursorVisible { get; private set; }
+    public bool ChargePressed { get; private set; }
     public bool ResupplyPressed { get; private set; }
 
+    private bool previousChargeState;
+    private bool previousFollowState;
+
     void Start(){
+        previousChargeState = false;
+        previousFollowState = false;
+    }
+
+    public void HideCursor(){
+        CursorVisible = false;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-        CursorVisible = false;
     }
 
     void Update(){
+        if(GameManager.Instance.currentState == GameManager.GameState.Menu || GameManager.Instance.currentState == GameManager.GameState.GameOver) return;
+
         if(Input.GetKeyDown(cursorToggleKey)){
             CursorVisible = !CursorVisible;
             Cursor.lockState = CursorVisible ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = CursorVisible;
         }
-        if(Input.GetKeyDown(resupplyToggleKey)) ResupplyPressed = !ResupplyPressed;
 
         MouseX = CursorVisible ? 0f : Input.GetAxis("Mouse X");
         MouseY = CursorVisible ? 0f : Input.GetAxis("Mouse Y");
@@ -57,5 +68,13 @@ public class InputHandler : MonoBehaviour
         AimHeld = CursorVisible ? false : Input.GetMouseButton(aimMouseButton);
         FirePressed = CursorVisible ? false : Input.GetMouseButtonDown(fireMouseButton);
         FireHeld = CursorVisible ? false : Input.GetMouseButton(fireMouseButton);
+
+        bool currentCharge = Input.GetKeyDown(chargeKey);
+        ChargePressed = currentCharge && !previousChargeState;
+        previousChargeState = currentCharge;
+
+        bool currentFollow = Input.GetKeyDown(rechargeKey);
+        ResupplyPressed = currentFollow && !previousFollowState;
+        previousFollowState = currentFollow;
     }
 }

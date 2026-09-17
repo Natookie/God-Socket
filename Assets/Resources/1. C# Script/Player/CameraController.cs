@@ -111,6 +111,7 @@ public class CameraController : MonoBehaviour
 
     void Update(){
         if(!normalCamera || !aimCamera || !input) return;
+        if(GameManager.Instance.currentState == GameManager.GameState.Menu || GameManager.Instance.currentState == GameManager.GameState.GameOver) return;
 
         UpdateCameraPriority(aiming);
         UpdateDutch(aiming);

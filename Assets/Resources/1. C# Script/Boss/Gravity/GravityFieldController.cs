@@ -190,7 +190,7 @@ public class GravityFieldController : MonoBehaviour
             gravityElements.Add(child);
         }
         
-        Debug.Log($"Populated {gravityElements.Count} gravity elements");
+        //Debug.Log($"Populated {gravityElements.Count} gravity elements");
         CacheElements();
     }
     

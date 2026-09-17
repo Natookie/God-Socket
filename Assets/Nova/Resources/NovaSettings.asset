@@ -16,7 +16,7 @@ MonoBehaviour:
     LogFlags: -1
     PackedImagesEnabled: 1
     PackedImageCopyMode: 0
-    SuperSampleText: 0
+    SuperSampleText: 1
     EdgeSoftenWidth: 1
     UIBlock3DCornerDivisions: 8
     UIBlock3DEdgeDivisions: 8

@@ -14379,7 +14379,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8753904135304619078}
-  m_Mesh: {fileID: 2534964839176971238, guid: 28da98a8a1f0ecc4495c9ac32ddc169f, type: 3}
+  m_Mesh: {fileID: 2534964839176971238, guid: 3ac3d3b3dbd46bd43a6c3288c052a29d, type: 3}
 --- !u!23 &6074719820157498521
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -14509,8 +14509,8 @@ MonoBehaviour:
   movementPredictionStrength: 1
   shootingPredictionTime: 0.8
   shootingPredictionStrength: 1
-  health: 70
-  damage: 15
+  health: 30
+  damage: 10
   attackRange: 35
   aimSpeed: 10
   projectilePrefab: {fileID: 5504401026066516806, guid: 6dbfec0202111e54a9f49e502c9070af, type: 3}

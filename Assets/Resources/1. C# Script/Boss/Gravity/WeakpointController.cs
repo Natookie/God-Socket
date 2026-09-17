@@ -12,38 +12,43 @@ public class WeakpointController : MonoBehaviour, IDamageable
     
     private bool isDestroyed = false;
     private bool isActive = false;
-    private Renderer[] renderers;
+    private Renderer thisRenderer;
+    private BoxCollider coll;
     private Material currentMaterial;
     private Material deactivatedMaterial;
     
     void Awake(){
-        if(visualObject != null){
-            renderers = visualObject.GetComponentsInChildren<Renderer>();
-        }
+        if(visualObject != null) thisRenderer = GetComponent<Renderer>();
     }
     
     void Start(){
         isActive = false;
         isDestroyed = false;
+        coll = GetComponent<BoxCollider>();
     }
     
     public void Activate(){
         isActive = true;
         isDestroyed = false;
+        if(coll) coll.enabled = true;
+        if(currentMaterial != null) SetMaterial(currentMaterial);
     }
     
     public void Deactivate(){
         isActive = false;
+        if(coll) coll.enabled = false;
         SetMaterial(deactivatedMaterial);
     }
     
     public void SetMaterial(Material material){
-        if(renderers == null || renderers.Length == 0) return;
         if(material == null) return;
         
         currentMaterial = material;
-        foreach(Renderer renderer in renderers){
-            if(renderer != null) renderer.material = material;
+        Material[] materials = new Material[1] { material };
+        
+        if(thisRenderer != null){
+            thisRenderer.sharedMaterials = materials;
+            thisRenderer.enabled = true;
         }
     }
     
@@ -58,13 +63,14 @@ public class WeakpointController : MonoBehaviour, IDamageable
         if(health <= 0){
             isDestroyed = true;
             isActive = false;
+            AudioManager.Instance.PlaySFX(GameSFX.UfoDestroyed);
             SetMaterial(deactivatedMaterial);
             OnWeakPointDestroyed?.Invoke(this);
         }
     }
     
     public Vector3 GetLaserOrigin() => laserOrigin != null ? laserOrigin.position : transform.position;
-    public bool IsAlive() => isActive && !isDestroyed;
+    public bool IsAlive() => !isDestroyed;
     
     public void ResetHealth(){
         health = 30f;

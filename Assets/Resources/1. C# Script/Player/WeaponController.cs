@@ -21,6 +21,7 @@ public class WeaponController : MonoBehaviour
     [Header("REFERENCES")]
     public InputHandler input;
     public EnergySystem energy;
+    public MovementController mc;
     public Camera playerCamera;
     public Transform playerTransform;
 
@@ -70,6 +71,7 @@ public class WeaponController : MonoBehaviour
 
     void TryFire(){
         if(!energy.CanAfford(energy.shotCost)) return;
+        if(mc.IsOverheated()) return;
 
         energy.Consume(energy.shotCost);
         if(projectilePrefab && firePoint && playerCamera){
@@ -84,6 +86,7 @@ public class WeaponController : MonoBehaviour
             if(projRb) projRb.linearVelocity = aimDirection * projectileSpeed;
             
             PlayMuzzleFlash();
+            AudioManager.Instance.PlaySFX(GameSFX.PlayerGun);
             
             CameraController.Instance.ShakeCamera(1f, 0.2f, CameraController.ShakePriority.Low);
         }

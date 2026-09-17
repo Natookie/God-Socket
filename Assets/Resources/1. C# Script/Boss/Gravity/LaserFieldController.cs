@@ -45,12 +45,8 @@ public class LaserFieldController : MonoBehaviour
     void Start(){
         if(laserMaterial == null){
             laserMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            if(laserMaterial == null){
-                laserMaterial = new Material(Shader.Find("Sprites/Default"));
-            }
-            if(laserMaterial != null){
-                laserMaterial.color = laserStartColor;
-            }
+            if(laserMaterial == null) laserMaterial = new Material(Shader.Find("Sprites/Default"));
+            if(laserMaterial != null) laserMaterial.color = laserStartColor;
         }
     }
     
@@ -71,9 +67,7 @@ public class LaserFieldController : MonoBehaviour
         }
         else{
             line.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            if(line.material == null){
-                line.material = new Material(Shader.Find("Sprites/Default"));
-            }
+            if(line.material == null) line.material = new Material(Shader.Find("Sprites/Default"));
         }
         
         line.startColor = laserStartColor;
@@ -89,6 +83,8 @@ public class LaserFieldController : MonoBehaviour
         beam.currentLength = 0.1f;
         beam.targetBuilding = target;
         activeLasers.Add(beam);
+
+        GameManager.Instance.GameOver("The alien destroyed the island\n(this phase will result in insta gameover)");
     }
     
     public void DeactivateLasers(){
